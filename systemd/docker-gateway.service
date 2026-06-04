@@ -1,7 +1,7 @@
 [Unit]
 Description=Docker Compose shared gateway
-Requires=docker.service docker-liberamerkato-api.service docker-granhermano.service
-After=docker.service docker-liberamerkato-api.service docker-granhermano.service network-online.target
+Requires=docker.service docker-liberamerkato-api.service docker-granhermano.service docker-zurdosanonimos.service
+After=docker.service docker-liberamerkato-api.service docker-granhermano.service docker-zurdosanonimos.service network-online.target
 Wants=network-online.target
 
 [Service]
