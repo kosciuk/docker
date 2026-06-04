@@ -18,12 +18,14 @@ services:
     volumes:
       - /var/www/granhermano/www:/var/www/html
       - granhermano_cache:/var/www/html/var/cache
+      - granhermano_vendor:/var/www/html/vendor
     networks:
       - shared_services
       - projects_public
 
 volumes:
   granhermano_cache:
+  granhermano_vendor:
 
 networks:
   shared_services:

@@ -142,6 +142,33 @@ Ver: [systemd/README.md](systemd/README.md)
 
 ---
 
+## Recuperación desde cero
+
+Si el VPS se reinicia o un contenedor falla y no arranca automáticamente:
+
+```bash
+# 1. Ver qué está corriendo
+docker ps
+
+# 2. Levantar servicios en orden
+sudo systemctl start docker-mysql.service
+sudo systemctl start docker-gateway.service
+sudo systemctl start docker-granhermano.service
+sudo systemctl start docker-zurdosanonimos.service
+
+# 3. Si el gateway no descubre un contenedor que acaba de arrancar, recargar Apache
+docker exec shared-gateway apachectl graceful
+
+# 4. Verificar logs si algo no responde
+docker logs shared-gateway --tail 30
+docker logs CONTENEDOR --tail 30
+```
+
+> Si un proyecto se muestra caído pero el servicio arranca correctamente (`systemctl status` dice active),
+> el problema suele ser que el gateway no reconectó el upstream. Alcanza con el `apachectl graceful`.
+
+---
+
 ## Comandos útiles
 
 ```bash

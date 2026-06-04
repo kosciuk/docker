@@ -13,11 +13,13 @@ services:
     volumes:
       - /var/www/zurdosanonimos/www:/var/www/html
       - zurdosanonimos_cache:/var/www/html/var/cache
+      - zurdosanonimos_vendor:/var/www/html/vendor
     networks:
       - projects_public
 
 volumes:
   zurdosanonimos_cache:
+  zurdosanonimos_vendor:
 
 networks:
   projects_public:

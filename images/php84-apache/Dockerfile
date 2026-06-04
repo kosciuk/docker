@@ -22,8 +22,14 @@ RUN apt-get update \
     && pecl install apcu \
     && docker-php-ext-enable apcu \
     && a2enmod rewrite headers expires \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 COPY images/php84-apache/vhost.conf /etc/apache2/sites-available/000-default.conf
+COPY images/php84-apache/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /var/www/html
+
+ENTRYPOINT ["entrypoint.sh"]
+CMD ["apache2-foreground"]
