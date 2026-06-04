@@ -73,8 +73,11 @@ ssh -T git@github.com
 ### 3. Clonar el repositorio
 
 ```bash
+sudo mkdir -p /var/www
+sudo chown $USER:$USER /var/www
+
 cd /var/www
-git clone <URL_SSH_DEL_REPO> docker
+git clone git@github.com:kosciuk/docker.git docker
 ```
 
 Para actualizar cuando hay cambios:
@@ -96,6 +99,10 @@ docker network create projects_public
 Si ya existen, Docker lo indicará y no pasa nada.
 
 ### 2. Crear archivos `.env`
+
+```bash
+cd /var/www/docker
+```
 
 Ejemplo para MySQL:
 
@@ -212,7 +219,7 @@ IP_DEL_VPS img.enforos.local
 2. Definir su compose y sus `.env.example`
 3. Conectarlo a `projects_public`
 4. Conectarlo a `shared_services` si usa servicios compartidos
-5. Crear un archivo `gateway/sites/NOMBRE.caddy`
+5. Crear un archivo `gateway/sites/NOMBRE.conf`
 
 ## Comandos útiles
 
