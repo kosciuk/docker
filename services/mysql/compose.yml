@@ -12,8 +12,6 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: ${TZ:-UTC}
     command:
-      - --default-authentication-plugin=caching_sha2_password
-      - --mysql-native-password=OFF
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     volumes:
