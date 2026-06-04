@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php85-apache/Dockerfile
+    container_name: liberamerkato-api
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_SECRET: ${APP_SECRET:-change-this-secret-key}
+      DB_DRIVER: pdo_mysql
+      DB_HOST: ${DB_HOST:-shared-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-liberamerkato}
+      DB_USER: ${DB_USER:-app}
+      DB_PASS: ${DB_PASS:-change_this_app_password}
+      JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret}
+      JWT_ISSUER: ${JWT_ISSUER:-liberamerkato}
+      JWT_EXPIRY: ${JWT_EXPIRY:-900}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-2592000}
+      STORAGE_PATH: /srv/img
+      STORAGE_URL: ${STORAGE_URL:-https://img.liberamerkato.local}
+      LOG_PATH: /var/www/html/storage/logs
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - /var/www/liberamerkato/api:/var/www/html
+      - /var/www/liberamerkato/img:/srv/img
+      - api_cache:/var/www/html/var/cache
+    networks:
+      - shared_services
+      - projects_public
+
+volumes:
+  api_cache:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services
+  projects_public:
+    external: true
+    name: projects_public

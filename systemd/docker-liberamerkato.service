@@ -1,0 +1,16 @@
+[Unit]
+Description=Docker Compose LiberaMerkato API
+Requires=docker.service docker-mysql.service
+After=docker.service docker-mysql.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/var/www/docker
+ExecStart=/usr/bin/docker compose --env-file /var/www/docker/projects/liberamerkato/env/api.env -f /var/www/docker/projects/liberamerkato/compose/api.yml up -d --build
+ExecStop=/usr/bin/docker compose --env-file /var/www/docker/projects/liberamerkato/env/api.env -f /var/www/docker/projects/liberamerkato/compose/api.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=Docker Compose shared gateway
+Requires=docker.service docker-liberamerkato.service docker-granhermano.service
+After=docker.service docker-liberamerkato.service docker-granhermano.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/var/www/docker
+ExecStart=/usr/bin/docker compose -f /var/www/docker/gateway/compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /var/www/docker/gateway/compose.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
