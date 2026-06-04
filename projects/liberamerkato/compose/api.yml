@@ -2,7 +2,7 @@ services:
   api:
     build:
       context: /var/www/docker
-      dockerfile: images/php85-apache/Dockerfile
+      dockerfile: images/php84-apache/Dockerfile
     container_name: liberamerkato-api
     restart: unless-stopped
     environment:

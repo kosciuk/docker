@@ -2,7 +2,7 @@ services:
   web:
     build:
       context: /var/www/docker
-      dockerfile: images/php85-apache/Dockerfile
+      dockerfile: images/php84-apache/Dockerfile
     container_name: granhermano-web
     restart: unless-stopped
     environment:

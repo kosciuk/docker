@@ -1,4 +1,4 @@
-FROM php:8.5-apache
+FROM php:8.4-apache
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -24,6 +24,6 @@ RUN apt-get update \
     && a2enmod rewrite headers expires \
     && rm -rf /var/lib/apt/lists/*
 
-COPY images/php85-apache/vhost.conf /etc/apache2/sites-available/000-default.conf
+COPY images/php84-apache/vhost.conf /etc/apache2/sites-available/000-default.conf
 
 WORKDIR /var/www/html
