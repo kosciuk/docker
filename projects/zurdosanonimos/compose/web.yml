@@ -1,0 +1,23 @@
+services:
+  web:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php85-apache/Dockerfile
+    container_name: zurdosanonimos-web
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - /var/www/zurdosanonimos/www:/var/www/html
+      - zurdosanonimos_cache:/var/www/html/var/cache
+    networks:
+      - projects_public
+
+volumes:
+  zurdosanonimos_cache:
+
+networks:
+  projects_public:
+    external: true
+    name: projects_public

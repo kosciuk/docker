@@ -1,0 +1,16 @@
+[Unit]
+Description=Docker Compose Zurdos Anónimos web
+Requires=docker.service docker-gateway.service
+After=docker.service docker-gateway.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/var/www/docker
+ExecStart=/usr/bin/docker compose --env-file /var/www/docker/projects/zurdosanonimos/env/web.env -f /var/www/docker/projects/zurdosanonimos/compose/web.yml up -d --build
+ExecStop=/usr/bin/docker compose --env-file /var/www/docker/projects/zurdosanonimos/env/web.env -f /var/www/docker/projects/zurdosanonimos/compose/web.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
