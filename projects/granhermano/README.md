@@ -2,11 +2,33 @@
 
 Sitio PHP clásico montado sobre el dominio principal.
 
-- Código fuente: `/var/www/granhermano/www`
+- Código fuente: `/var/www/granhermano/www` → git@github.com:granhermano-com-ar/www.git
 - Dev: `http://granhermano.local`
 - Prod: `https://granhermano.com.ar` (`www` redirige al canónico)
 
 El VirtualHost ya está definido en `gateway/sites/granhermano.conf` — no hay que configurar nada más.
+
+---
+
+## Primera vez en el VPS
+
+```bash
+git clone git@github.com:granhermano-com-ar/www.git /var/www/granhermano/www
+cp /var/www/granhermano/www/.env.example /var/www/granhermano/www/.env
+nano /var/www/granhermano/www/.env   # completar DB_USER y DB_PASS
+composer install --no-dev -o --working-dir=/var/www/granhermano/www
+```
+
+---
+
+## Deploy (actualizar código)
+
+```bash
+git -C /var/www/granhermano/www pull
+composer install --no-dev -o --working-dir=/var/www/granhermano/www
+```
+
+No hace falta reiniciar el contenedor — el volumen bind sirve el código directamente.
 
 ---
 
