@@ -1,52 +1,54 @@
 # Gran Hermano
 
-Stack del proyecto `granhermano`.
+Sitio PHP clásico montado sobre el dominio principal.
 
-## Código fuente usado
-
-- Web PHP: `/var/www/granhermano/www`
-
-## Dominios
-
+- Código fuente: `/var/www/granhermano/www`
 - Dev: `http://granhermano.local`
-- Prod: `https://granhermano.com.ar`
-- `https://www.granhermano.com.ar` redirige a `https://granhermano.com.ar`
+- Prod: `https://granhermano.com.ar` (`www` redirige al canónico)
 
-## Cómo funciona el routing
+El VirtualHost ya está definido en `gateway/sites/granhermano.conf` — no hay que configurar nada más.
 
-No hay que configurar VirtualHosts manualmente. El gateway Apache ya tiene el archivo
-`/var/www/docker/gateway/sites/granhermano.conf` con los VirtualHost definidos:
-
-- En desarrollo, `granhermano.local` hace proxy al contenedor `granhermano-web`.
-- En producción, `granhermano.com.ar` hace lo mismo y Apache gestiona el SSL solo.
-
-Lo único que hay que hacer es levantar el gateway y el contenedor del proyecto.
-
-## Requisitos previos
-
-```bash
-# Redes compartidas (solo la primera vez)
-docker network create shared_services
-docker network create projects_public
-
-# Gateway (si no está corriendo)
-docker compose -f /var/www/docker/gateway/compose.yml up -d
-```
+---
 
 ## Levantar el proyecto
 
-```bash
-cp /var/www/docker/projects/granhermano/env/web.env.example \
-   /var/www/docker/projects/granhermano/env/web.env
+### 1. Redes (si no existen)
 
-# Editar web.env con las credenciales reales
-nano /var/www/docker/projects/granhermano/env/web.env
+```bash
+docker network create shared_services
+docker network create projects_public
+```
+
+### 2. MySQL (si no está corriendo)
+
+```bash
+cd /var/www/docker
+cp services/mysql/.env.example services/mysql/.env
+nano services/mysql/.env
+
+docker compose --env-file services/mysql/.env -f services/mysql/compose.yml up -d
+```
+
+### 3. Gateway (si no está corriendo)
+
+```bash
+docker compose -f /var/www/docker/gateway/compose.yml up -d
+```
+
+### 4. El sitio
+
+```bash
+cd /var/www/docker
+cp projects/granhermano/env/web.env.example projects/granhermano/env/web.env
+nano projects/granhermano/env/web.env
 
 docker compose \
-  --env-file /var/www/docker/projects/granhermano/env/web.env \
-  -f /var/www/docker/projects/granhermano/compose/web.yml \
+  --env-file projects/granhermano/env/web.env \
+  -f projects/granhermano/compose/web.yml \
   up -d --build
 ```
+
+---
 
 ## Hosts locales (en tu máquina)
 
@@ -56,10 +58,12 @@ Agregar en `/etc/hosts`:
 IP_DEL_VPS granhermano.local
 ```
 
+---
+
 ## Producción
 
-Para `granhermano.com.ar`, Apache (`mod_md`) emite el certificado Let's Encrypt automáticamente si:
+Apache (`mod_md`) obtiene el certificado Let's Encrypt automáticamente si:
 
-- el dominio apunta al VPS (registro A en el DNS)
-- los puertos `80` y `443` están abiertos en el firewall
+- el registro DNS apunta al VPS
+- los puertos `80` y `443` están abiertos
 - el gateway está corriendo
