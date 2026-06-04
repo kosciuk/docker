@@ -32,4 +32,5 @@ volumes:
 
 networks:
   shared_services:
+    external: true
     name: shared_services
