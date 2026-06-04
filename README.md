@@ -113,7 +113,6 @@ Para dominios `.local` usa HTTP en puerto 80.
 Cada proyecto tiene su propio README con los pasos completos:
 
 - [projects/granhermano/README.md](projects/granhermano/README.md)
-- [projects/liberamerkato/README.md](projects/liberamerkato/README.md)
 
 ---
 

@@ -15,21 +15,17 @@ Además, la infraestructura reutilizable queda separada por tipo:
 
 ```text
 projects/
-├── liberamerkato/
-│   ├── compose/
-│   │   └── api.yml
-│   ├── env/
-│   │   └── api.env.example
-│   └── README.md
 ├── granhermano/
 │   ├── compose/
 │   │   └── web.yml
 │   ├── env/
 │   │   └── web.env.example
 │   └── README.md
-└── enforos/
+└── zurdosanonimos/
     ├── compose/
+    │   └── web.yml
     ├── env/
+    │   └── web.env.example
     └── README.md
 ```
 

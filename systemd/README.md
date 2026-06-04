@@ -6,7 +6,6 @@ Estas unidades permiten administrar los stacks Docker con `systemd`.
 
 - `docker-mysql.service`
 - `docker-gateway.service`
-- `docker-liberamerkato-api.service`
 - `docker-granhermano.service`
 - `docker-zurdosanonimos.service`
 
@@ -28,7 +27,6 @@ Habilitar arranque automático:
 
 ```bash
 sudo systemctl enable docker-mysql.service
-sudo systemctl enable docker-liberamerkato-api.service
 sudo systemctl enable docker-granhermano.service
 sudo systemctl enable docker-zurdosanonimos.service
 sudo systemctl enable docker-gateway.service
@@ -38,7 +36,6 @@ Iniciar los servicios:
 
 ```bash
 sudo systemctl start docker-mysql.service
-sudo systemctl start docker-liberamerkato-api.service
 sudo systemctl start docker-granhermano.service
 sudo systemctl start docker-zurdosanonimos.service
 sudo systemctl start docker-gateway.service
@@ -47,7 +44,6 @@ sudo systemctl start docker-gateway.service
 ## Orden sugerido
 
 - `docker-mysql.service`
-- `docker-liberamerkato-api.service`
 - `docker-granhermano.service`
 - `docker-zurdosanonimos.service`
 - `docker-gateway.service`
@@ -59,7 +55,6 @@ El gateway queda al final para que los backends ya estén arriba cuando Caddy em
 Después de hacer `git pull`:
 
 ```bash
-sudo systemctl restart docker-liberamerkato-api.service
 sudo systemctl restart docker-granhermano.service
 sudo systemctl restart docker-zurdosanonimos.service
 sudo systemctl restart docker-gateway.service

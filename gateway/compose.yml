@@ -9,8 +9,6 @@ services:
     volumes:
       - /var/www/docker/gateway/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
       - /var/www/docker/gateway/sites:/usr/local/apache2/conf/sites:ro
-      - /var/www/liberamerkato/app/dist:/srv/liberamerkato/app:ro
-      - /var/www/liberamerkato/img:/srv/liberamerkato/img:ro
       - gateway_md:/usr/local/apache2/md
     networks:
       - projects_public

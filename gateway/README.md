@@ -9,8 +9,7 @@ gateway/
 ├── compose.yml
 ├── httpd.conf
 └── sites/
-    ├── granhermano.conf
-    └── liberamerkato.conf
+    └── granhermano.conf
 ```
 
 ## Idea
@@ -28,13 +27,7 @@ gateway/
 
 ## Patrones recomendados
 
-### 1. Proyecto con `api`, `app`, `img` y `www`
-
-```apache
-MDomain liberamerkato.com api.liberamerkato.com img.liberamerkato.com app.liberamerkato.com www.liberamerkato.com
-```
-
-### 2. Sitio directo sobre el dominio principal
+### 1. Sitio directo sobre el dominio principal
 
 ```apache
 MDomain granhermano.com.ar www.granhermano.com.ar
