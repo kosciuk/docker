@@ -1,3 +1,5 @@
+name: liberamerkato_api
+
 services:
   api:
     build:
