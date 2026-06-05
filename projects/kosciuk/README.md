@@ -68,6 +68,13 @@ curl -I http://kosciuk.local
 curl -I http://kosciuk.com.ar          # debe redirigir a https
 curl -I https://kosciuk.com.ar         # debe devolver 200
 
+# Si https devuelve certificado self-signed, mod_md puede estar procesando el cert.
+# Verificar estado:
+docker logs shared-gateway 2>&1 | grep -i kosciuk | tail -20
+# Cuando aparece "has been setup and changes will be activated on next (graceful) server restart",
+# ejecutar:
+docker exec shared-gateway apachectl graceful
+
 # Estado del servicio systemd
 sudo systemctl status docker-kosciuk.service
 ```
