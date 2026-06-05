@@ -12,17 +12,47 @@ Servidor de correo compartido basado en [docker-mailserver](https://github.com/d
 
 ### 1. Obtener certificado SSL
 
-El puerto 25 debe estar libre (detener cualquier servicio que lo use). Certbot usará el modo standalone:
+Como el puerto 80 está ocupado por el gateway, se usa el método DNS challenge via plugin de OVH. Esto también habilita la renovación automática.
+
+**Instalar certbot y el plugin OVH:**
+```bash
+apt install certbot python3-certbot-dns-ovh
+```
+
+**Crear token en la API de OVH:**
+
+Entrá a https://api.ovh.com/createToken/ con estos permisos y validez **Unlimited**:
+- `GET /domain/zone/*`
+- `PUT /domain/zone/*`
+- `POST /domain/zone/*`
+- `DELETE /domain/zone/*`
+
+**Guardar las credenciales en el VPS:**
+```bash
+mkdir -p /etc/letsencrypt/ovh
+nano /etc/letsencrypt/ovh/credentials.ini
+```
+
+Contenido:
+```ini
+dns_ovh_endpoint = ovh-ca
+dns_ovh_application_key = TU_APP_KEY
+dns_ovh_application_secret = TU_APP_SECRET
+dns_ovh_consumer_key = TU_CONSUMER_KEY
+```
 
 ```bash
-apt install certbot
-certbot certonly --standalone -d mail.protesto.com.ar
+chmod 600 /etc/letsencrypt/ovh/credentials.ini
+```
+
+**Emitir el certificado:**
+```bash
+certbot certonly --dns-ovh --dns-ovh-credentials /etc/letsencrypt/ovh/credentials.ini -d mail.protesto.com.ar
 ```
 
 El certificado queda en `/etc/letsencrypt/live/mail.protesto.com.ar/`. El contenedor lo monta como read-only desde `/etc/letsencrypt`.
 
-**Renovación automática:** certbot instala un timer systemd que renueva automáticamente. Para verificar:
-
+**Verificar renovación automática:**
 ```bash
 systemctl status certbot.timer
 ```
