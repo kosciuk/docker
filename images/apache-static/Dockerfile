@@ -11,4 +11,6 @@ COPY images/apache-static/vhost.conf /usr/local/apache2/conf/extra/vhost.conf
 
 RUN echo "Include conf/extra/vhost.conf" >> /usr/local/apache2/conf/httpd.conf
 
+RUN echo "ServerName localhost" >> /usr/local/apache2/conf/httpd.conf
+
 WORKDIR /usr/local/apache2/htdocs
