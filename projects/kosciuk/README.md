@@ -52,6 +52,28 @@ rsync -avz --delete _site/ user@vps:/var/www/kosciuk/www/
 
 ---
 
+## Verificar que todo está funcionando
+
+```bash
+# El contenedor está corriendo
+docker ps | grep kosciuk-web
+
+# Logs del contenedor
+docker logs kosciuk-web
+
+# El gateway responde (reemplazar IP_DEL_VPS)
+curl -I http://kosciuk.local
+
+# En producción, verificar SSL y redirección
+curl -I http://kosciuk.com.ar          # debe redirigir a https
+curl -I https://kosciuk.com.ar         # debe devolver 200
+
+# Estado del servicio systemd
+sudo systemctl status docker-kosciuk.service
+```
+
+---
+
 ## Hosts locales (en tu máquina)
 
 Agregar en `/etc/hosts`:
