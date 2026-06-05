@@ -1,0 +1,43 @@
+name: mailserver
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    container_name: shared-mailserver
+    hostname: mail.protesto.com.ar
+    restart: unless-stopped
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    environment:
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      ENABLE_RSPAMD: 1
+      ENABLE_CLAMAV: 0
+      ENABLE_FAIL2BAN: 1
+      SSL_TYPE: letsencrypt
+      PERMIT_DOCKER: none
+      POSTFIX_INET_PROTOCOLS: ipv4
+      LOG_LEVEL: info
+    volumes:
+      - mailserver_data:/var/mail
+      - mailserver_state:/var/mail-state
+      - mailserver_logs:/var/log/mail
+      - mailserver_config:/tmp/docker-mailserver
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - shared_services
+
+volumes:
+  mailserver_data:
+  mailserver_state:
+  mailserver_logs:
+  mailserver_config:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services
