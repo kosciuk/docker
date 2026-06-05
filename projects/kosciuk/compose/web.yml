@@ -1,0 +1,20 @@
+name: kosciuk
+
+services:
+  web:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: kosciuk-web
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - /var/www/kosciuk/www:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+networks:
+  projects_public:
+    external: true
+    name: projects_public
