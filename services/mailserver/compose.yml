@@ -14,6 +14,7 @@ services:
     environment:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
       ENABLE_RSPAMD: 1
+      ENABLE_OPENDKIM: 0
       ENABLE_CLAMAV: 0
       ENABLE_FAIL2BAN: 1
       SSL_TYPE: letsencrypt
