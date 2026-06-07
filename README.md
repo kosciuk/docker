@@ -169,6 +169,70 @@ docker logs CONTENEDOR --tail 30
 
 ---
 
+## Certificados SSL (mod_md / Let's Encrypt)
+
+mod_md obtiene los certificados automáticamente, pero el proceso tiene varias etapas. Si el browser muestra certificado self-signed o error SSL, seguir este checklist en orden.
+
+### 1. Verificar que el DNS apunta al VPS
+
+```bash
+dig +short auth.linkedcode.com
+# debe devolver la IP del VPS
+```
+
+Si el DNS no resuelve todavía, mod_md no puede completar el challenge HTTP-01 y no va a emitir el cert.
+
+### 2. Ver el estado en los logs del gateway
+
+```bash
+docker logs shared-gateway 2>&1 | grep -i "md\|acme\|cert\|DOMINIO" | tail -30
+```
+
+Mensajes clave:
+
+| Mensaje | Significado |
+|---|---|
+| `certificate for domains ... has been setup` | Cert obtenido, falta reiniciar |
+| `renewing certificate` | En proceso, esperar |
+| `problem with ... (challenge)` | El DNS no resuelve o el puerto 80 está bloqueado |
+| `Letting-Encrypt rate limit` | Demasiados intentos, esperar horas |
+
+### 3. Si el log dice "has been setup" → reiniciar el gateway
+
+```bash
+sudo systemctl restart docker-gateway.service
+```
+
+Un `apachectl graceful` no es suficiente en todos los casos — el reinicio completo es más confiable.
+
+### 4. Si el cert sigue siendo self-signed después del reinicio
+
+mod_md guarda los certificados en un volumen Docker. Verificar que el volumen persiste entre reinicios:
+
+```bash
+docker volume ls | grep gateway
+docker exec shared-gateway ls /usr/local/apache2/md/domains/
+```
+
+Si el directorio del dominio está vacío, mod_md todavía no completó el challenge. Esperar unos minutos y volver a revisar los logs.
+
+### 5. Si el challenge falla repetidamente
+
+Causas comunes:
+- El puerto 80 no está abierto en el firewall del VPS (`ufw status`)
+- El dominio tiene un CAA record que bloquea Let's Encrypt
+- El dominio no tiene registro A apuntando al VPS aún (TTL pendiente)
+
+### 6. Forzar renovación manual (último recurso)
+
+```bash
+# Eliminar el estado de mod_md para el dominio y reiniciar
+docker exec shared-gateway rm -rf /usr/local/apache2/md/domains/DOMINIO
+sudo systemctl restart docker-gateway.service
+```
+
+---
+
 ## Comandos útiles
 
 ```bash
