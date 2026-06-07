@@ -1,0 +1,47 @@
+name: linkedcode
+
+services:
+  auth:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php84-apache/Dockerfile
+    container_name: linkedcode-auth
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DB_HOST: ${DB_HOST:-shared-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-linkedcode_auth}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - /var/www/linkedcode/auth.linkedcode.com:/var/www/html
+      - linkedcode_auth_cache:/var/www/html/var/cache
+      - linkedcode_auth_vendor:/var/www/html/vendor
+    networks:
+      - shared_services
+      - projects_public
+
+  www:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: linkedcode-www
+    restart: unless-stopped
+    volumes:
+      - /var/www/linkedcode/www.linkedcode.com:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+volumes:
+  linkedcode_auth_cache:
+  linkedcode_auth_vendor:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services
+  projects_public:
+    external: true
+    name: projects_public
