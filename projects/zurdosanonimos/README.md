@@ -55,3 +55,9 @@ Apache (`mod_md`) obtiene el certificado Let's Encrypt automáticamente si:
 - el registro DNS apunta al VPS
 - los puertos `80` y `443` están abiertos
 - el gateway está corriendo
+
+mod_md descarga el certificado en el primer arranque, pero Apache necesita un reinicio para activarlo:
+
+```bash
+sudo systemctl restart docker-gateway.service
+```
