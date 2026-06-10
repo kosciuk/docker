@@ -47,7 +47,7 @@ docker exec shared-gateway apachectl graceful
 Desde tu máquina local, una vez generado el HTML:
 
 ```bash
-rsync -avz --delete _site/ user@vps:/var/www/kosciuk/www/
+rsync -avz --delete _site/ ubuntu@IP_DEL_VPS:/var/www/kosciuk/www/
 ```
 
 ---
