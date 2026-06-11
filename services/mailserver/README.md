@@ -6,7 +6,7 @@ Servidor de correo compartido basado en [docker-mailserver](https://github.com/d
 - IMAP: puerto 993 (IMAPS)
 - Recepción MX: puerto 25
 - SSL: Let's Encrypt (certbot, montado desde `/etc/letsencrypt`)
-- Antispam: Rspamd
+- Antispam: Rspamd (firma DKIM incluida)
 
 ## Primer uso — puesta en marcha
 
@@ -79,10 +79,9 @@ docker exec shared-mailserver setup email add info@protesto.com.ar CONTRASEÑA
 
 ```bash
 docker exec shared-mailserver setup config dkim domain protesto.com.ar
-docker exec shared-mailserver cat /tmp/docker-mailserver/opendkim/keys/protesto.com.ar/mail.txt
 ```
 
-El output es el valor del registro TXT que hay que crear en OVH como `mail._domainkey.protesto.com.ar`.
+El comando muestra en el output el valor exacto del registro TXT. Crearlo en OVH como `mail._domainkey.protesto.com.ar`.
 
 ### 6. Instalar systemd
 
@@ -94,41 +93,55 @@ sudo systemctl enable docker-mailserver
 
 ---
 
-## Levantar
+## Gestión de usuarios
 
+**Listar cuentas existentes:**
 ```bash
-cp services/mailserver/.env.example services/mailserver/.env
-docker compose --env-file services/mailserver/.env -f services/mailserver/compose.yml up -d
+docker exec shared-mailserver setup email list
 ```
 
-## Agregar usuario
-
+**Agregar usuario:**
 ```bash
 docker exec shared-mailserver setup email add usuario@protesto.com.ar CONTRASEÑA
 ```
 
-## Agregar alias
+**Cambiar contraseña:**
+```bash
+docker exec shared-mailserver setup email update usuario@protesto.com.ar NUEVA_CONTRASEÑA
+```
 
+**Eliminar usuario:**
+```bash
+docker exec shared-mailserver setup email del usuario@protesto.com.ar
+```
+
+## Alias y subdireccionamiento
+
+**Agregar alias** (redirige a otra cuenta):
 ```bash
 docker exec shared-mailserver setup alias add info@protesto.com.ar usuario@protesto.com.ar
 ```
 
-## Generar DKIM (ejecutar una vez al inicio)
+**Listar alias:**
+```bash
+docker exec shared-mailserver setup alias list
+```
 
+**Subdireccionamiento con `+`** (funciona sin configuración extra):
+
+docker-mailserver soporta de forma nativa el formato `usuario+etiqueta@dominio.com`. Todos los correos enviados a `info+trabajo@protesto.com.ar` o `info+newsletter@protesto.com.ar` llegan a la bandeja de `info@protesto.com.ar`. Útil para filtrar correos por origen en el cliente de correo.
+
+## DKIM
+
+**Generar claves para un dominio:**
 ```bash
 docker exec shared-mailserver setup config dkim domain protesto.com.ar
 ```
 
-Luego leer la clave generada y agregarla como TXT en el DNS:
+**Agregar dominio adicional:**
 
-```bash
-docker exec shared-mailserver cat /tmp/docker-mailserver/opendkim/keys/protesto.com.ar/mail.txt
-```
-
-## Agregar dominio adicional
-
-1. Crear usuario en el nuevo dominio: `setup email add info@otrodominio.com PASS`
-2. Generar DKIM: `setup config dkim domain otrodominio.com`
+1. Crear usuario: `docker exec shared-mailserver setup email add info@otrodominio.com PASS`
+2. Generar DKIM: `docker exec shared-mailserver setup config dkim domain otrodominio.com`
 3. Agregar MX, SPF, DKIM y DMARC en el DNS del nuevo dominio
 
 ## Systemd
