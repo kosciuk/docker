@@ -5,8 +5,12 @@ services:
     image: httpd:2.4
     container_name: granhermano-web
     restart: unless-stopped
+    command: >
+      sh -c "echo 'Include conf/extra/rewrite.conf' >> /usr/local/apache2/conf/httpd.conf
+      && httpd-foreground"
     volumes:
       - /var/www/granhermano/www:/usr/local/apache2/htdocs
+      - /var/www/docker/projects/granhermano/config/rewrite.conf:/usr/local/apache2/conf/extra/rewrite.conf:ro
     networks:
       - projects_public
 
