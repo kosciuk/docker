@@ -2,35 +2,15 @@ name: granhermano
 
 services:
   web:
-    build:
-      context: /var/www/docker
-      dockerfile: images/php84-apache/Dockerfile
+    image: httpd:2.4
     container_name: granhermano-web
     restart: unless-stopped
-    environment:
-      APP_ENV: ${APP_ENV:-development}
-      DB_HOST: ${DB_HOST:-shared-mysql}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_NAME: ${DB_NAME:-granhermano}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
-      TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
-      - /var/www/granhermano/www:/var/www/html
-      - granhermano_cache:/var/www/html/var/cache
-      - granhermano_vendor:/var/www/html/vendor
+      - /var/www/granhermano/www:/usr/local/apache2/htdocs
     networks:
-      - shared_services
       - projects_public
 
-volumes:
-  granhermano_cache:
-  granhermano_vendor:
-
 networks:
-  shared_services:
-    external: true
-    name: shared_services
   projects_public:
     external: true
     name: projects_public
