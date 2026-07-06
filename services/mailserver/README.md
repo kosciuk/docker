@@ -144,6 +144,47 @@ docker exec shared-mailserver setup config dkim domain protesto.com.ar
 2. Generar DKIM: `docker exec shared-mailserver setup config dkim domain otrodominio.com`
 3. Agregar MX, SPF, DKIM y DMARC en el DNS del nuevo dominio
 
+## Catch-all para reply tracking (subdominio `replies.protesto.com.ar`)
+
+Permite recibir correos en `[hash]@replies.protesto.com.ar` para rastrear respuestas de usuarios sin parsear el asunto. El `Reply-To` de cada mail saliente lleva el hash del reclamo.
+
+### 1. DNS (en OVH)
+
+Agregar registro MX para el subdominio:
+```
+replies.protesto.com.ar  MX  10  mail.protesto.com.ar
+```
+
+### 2. Agregar el dominio al mailserver
+
+```bash
+docker exec shared-mailserver setup email add replies@replies.protesto.com.ar CONTRASEÑA_SEGURA
+docker exec shared-mailserver setup config dkim domain replies.protesto.com.ar
+```
+
+El comando DKIM mostrará el valor del registro TXT. Crearlo en OVH como `mail._domainkey.replies.protesto.com.ar`.
+
+### 3. Configurar el catch-all
+
+```bash
+docker exec -it shared-mailserver bash
+echo "@replies.protesto.com.ar  r@protesto.com.ar" >> /tmp/docker-mailserver/postfix-virtual.cf
+postfix reload
+```
+
+A partir de ahí, cualquier correo a `*@replies.protesto.com.ar` llega a `yo@protesto.com.ar`.
+
+### Uso en la app
+
+Al enviar notificaciones al ciudadano, incluir el header:
+```
+Reply-To: <hash_del_reclamo>@replies.protesto.com.ar
+```
+
+Al recibir la respuesta, el hash se extrae directamente de la dirección `To:` del mail entrante — sin parsear el asunto.
+
+---
+
 ## Systemd
 
 ```bash
