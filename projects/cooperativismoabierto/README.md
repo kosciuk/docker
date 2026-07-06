@@ -58,6 +58,18 @@ docker compose -f /var/www/docker/projects/cooperativismoabierto/compose/web.yml
 
 ---
 
+## Arranque automático con systemd
+
+Copiar el unit al VPS y habilitarlo (ver también `systemd/README.md`):
+
+```bash
+sudo cp /var/www/docker/systemd/docker-cooperativismoabierto.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now docker-cooperativismoabierto.service
+```
+
+---
+
 ## Hosts locales (en tu máquina)
 
 Agregar en `/etc/hosts`:
