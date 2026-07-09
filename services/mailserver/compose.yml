@@ -4,7 +4,7 @@ services:
   mailserver:
     image: ghcr.io/docker-mailserver/docker-mailserver:latest
     container_name: shared-mailserver
-    hostname: mail.protesto.com.ar
+    hostname: mail.linkedcode.com
     restart: unless-stopped
     ports:
       - "25:25"
