@@ -1,7 +1,6 @@
 FROM php:8.4-fpm
 
 RUN set -eux; \
-    savedAptMark="$(apt-mark showmanual)"; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         apache2 \
@@ -25,16 +24,6 @@ RUN set -eux; \
     pecl install apcu; \
     docker-php-ext-enable apcu; \
     a2enmod rewrite headers expires proxy proxy_fcgi; \
-    apt-mark auto '.*' > /dev/null; \
-    apt-mark manual $savedAptMark apache2 curl git unzip zip; \
-    ldd "$(php -r 'echo ini_get("extension_dir");')"/*.so \
-        | awk '/=>/ { print $3 }' \
-        | sort -u \
-        | xargs -r dpkg-query -S \
-        | cut -d: -f1 \
-        | sort -u \
-        | xargs -r apt-mark manual; \
-    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
     rm -rf /var/lib/apt/lists/*; \
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; \
     cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
