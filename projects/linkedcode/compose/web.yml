@@ -4,7 +4,7 @@ services:
   auth:
     build:
       context: /var/www/docker
-      dockerfile: images/php84-apache/Dockerfile
+      dockerfile: images/php84-fpm/Dockerfile
     container_name: linkedcode-auth
     restart: unless-stopped
     environment:

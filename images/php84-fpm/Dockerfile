@@ -1,7 +1,8 @@
-FROM php:8.4-apache
+FROM php:8.4-fpm
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        apache2 \
         curl \
         git \
         libfreetype6-dev \
@@ -21,12 +22,13 @@ RUN apt-get update \
         zip \
     && pecl install apcu \
     && docker-php-ext-enable apcu \
-    && a2enmod rewrite headers expires \
+    && a2enmod rewrite headers expires proxy proxy_fcgi \
     && rm -rf /var/lib/apt/lists/* \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-COPY images/php84-apache/vhost.conf /etc/apache2/sites-available/000-default.conf
-COPY images/php84-apache/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY images/php84-fpm/vhost.conf /etc/apache2/sites-available/000-default.conf
+COPY images/php84-fpm/www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY images/php84-fpm/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /var/www/html
