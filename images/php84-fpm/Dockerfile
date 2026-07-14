@@ -34,4 +34,4 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 WORKDIR /var/www/html
 
 ENTRYPOINT ["entrypoint.sh"]
-CMD ["apache2-foreground"]
+CMD ["apache2ctl", "-D", "FOREGROUND"]
