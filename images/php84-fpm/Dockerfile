@@ -24,6 +24,7 @@ RUN set -eux; \
     pecl install apcu; \
     docker-php-ext-enable apcu; \
     a2enmod rewrite headers expires proxy proxy_fcgi; \
+    echo "ServerName localhost" >> /etc/apache2/apache2.conf; \
     rm -rf /var/lib/apt/lists/*; \
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; \
     cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
