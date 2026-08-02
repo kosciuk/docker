@@ -64,8 +64,13 @@ proyecto que las genere — se crean a mano en el VPS:
 openssl genrsa -out /var/www/linkedcode/auth.linkedcode.com/config/private.key 2048
 openssl rsa -in /var/www/linkedcode/auth.linkedcode.com/config/private.key \
   -pubout -out /var/www/linkedcode/auth.linkedcode.com/config/public.key
-chmod 600 /var/www/linkedcode/auth.linkedcode.com/config/private.key
+chmod 644 /var/www/linkedcode/auth.linkedcode.com/config/private.key
 ```
+
+`644` y no `600`: el archivo se bind-mountea al contenedor y lo lee el proceso
+`www-data` de PHP-FPM, con un UID distinto al del usuario que generó el key en el
+host — con `600` solo el dueño (el usuario del host) puede leerlo y PHP falla con
+`FileCouldNotBeRead`.
 
 ---
 
