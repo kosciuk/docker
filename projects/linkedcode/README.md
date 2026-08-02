@@ -102,8 +102,40 @@ servicio Docker de Ember en vez del valor de desarrollo local:
 ],
 ```
 
-De paso, revisar también el bloque `db_prod`/`db` de ese mismo archivo — debe apuntar a
-`shared-mysql` (host, usuario y password reales), no a los valores de ejemplo.
+De paso, revisar también el bloque `db` de ese mismo archivo — debe apuntar a
+`shared-mysql` (host, usuario y password reales), no a los valores de ejemplo. Ojo:
+la app lee la conexión de la clave `db`, no de `db_prod` (esa queda sin usar en el
+código) ni de `DB_USER`/`DB_PASS` del compose — esas env vars tampoco las lee nadie.
+
+---
+
+## Crear un cliente OAuth
+
+Los clientes (apps que van a autenticar contra `auth.linkedcode.com`) se dan de alta
+con un script, no hay UI ni endpoint HTTP para esto:
+
+```bash
+docker exec -it linkedcode-auth php bin/create-client.php \
+  --name="Nombre de la app" \
+  --grant-type=authorization_code \
+  --redirect-uri="https://miapp.com/oauth/callback"
+```
+
+Parámetros:
+
+| Flag | Obligatorio | Notas |
+|---|---|---|
+| `--name` | sí | máx. 30 caracteres, se trunca si es más largo |
+| `--grant-type` | sí | `authorization_code`, `client_credentials`, `password` o `refresh_token` |
+| `--redirect-uri` | sí | debe matchear exacto con la que use el cliente al pedir el `authorization_code` |
+| `--identifier` | no | si no se pasa, se autogenera (`slug-random@linkedcode.com`) |
+| `--secret` | no | si no se pasa, se autogenera (random de 64 hex) |
+| `--confidential` | no | `true` por defecto; usar `--confidential=false` para clientes públicos (SPA/mobile sin backend que guarde el secret) |
+
+El script imprime `identifier` y `secret` al terminar — copiarlos ahí mismo, no quedan
+guardados en ningún lado en texto plano (el `secret` se persiste hasheado).
+
+Si se pasan flags sin valor (ej. `--name` solo), el script pide el dato por stdin.
 
 ---
 
