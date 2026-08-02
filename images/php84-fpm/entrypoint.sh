@@ -4,6 +4,8 @@ set -e
 mkdir -p /run/php
 chown www-data:www-data /run/php
 
+git config --global --add safe.directory /var/www/html
+
 if [ -d /var/www/html/var/cache ]; then
     chown -R www-data:www-data /var/www/html/var/cache
 fi
