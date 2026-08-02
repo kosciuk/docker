@@ -14,13 +14,19 @@ se hacen con `bin/ember.php` dentro del contenedor (ver `README.md` del propio p
 
 ## Primera instalación en el VPS
 
-### 1. Red compartida (si no existe)
+### 1. Clonar el proyecto Ember
+
+```bash
+git clone git@github.com:linkedcode/ember.git /var/www/linkedcode/ember.linkedcode.com
+```
+
+### 2. Red compartida (si no existe)
 
 ```bash
 docker network create shared_services
 ```
 
-### 2. Env
+### 3. Env
 
 ```bash
 cp /var/www/docker/projects/ember/env/web.env.example /var/www/docker/projects/ember/env/web.env
@@ -29,14 +35,14 @@ cp /var/www/docker/projects/ember/env/web.env.example /var/www/docker/projects/e
 Completar `DB_USER` / `DB_PASS` (usuario de `shared-mysql`) y `SMTP_PASS_KEY` (clave usada
 para cifrar los `smtp_pass` de cada proyecto en la tabla `projects`, ver `sql/schema.sql`).
 
-### 3. Base de datos
+### 4. Base de datos
 
 ```bash
 docker exec -i shared-mysql mysql -u root -pPASS -e "CREATE DATABASE IF NOT EXISTS ember"
 docker exec -i shared-mysql mysql -u root -pPASS ember < /var/www/linkedcode/ember.linkedcode.com/sql/schema.sql
 ```
 
-### 4. Levantar el contenedor con systemd
+### 5. Levantar el contenedor con systemd
 
 ```bash
 sudo cp /var/www/docker/systemd/docker-ember.service /etc/systemd/system/
@@ -44,7 +50,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now docker-ember.service
 ```
 
-### 5. Worker de la cola (cron cada 1 minuto)
+### 6. Worker de la cola (cron cada 1 minuto)
 
 ```bash
 sudo cp /var/www/docker/systemd/docker-ember-cron.service /etc/systemd/system/
