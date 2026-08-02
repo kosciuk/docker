@@ -1,0 +1,35 @@
+name: ember
+
+services:
+  app:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php84-fpm/Dockerfile
+    container_name: ember-app
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DB_HOST: ${DB_HOST:-shared-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-ember}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      SMTP_PASS_KEY: ${SMTP_PASS_KEY}
+      QUEUE_BATCH_SIZE: ${QUEUE_BATCH_SIZE:-50}
+      QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-3}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - /var/www/linkedcode/ember.linkedcode.com:/var/www/html
+      - ember_cache:/var/www/html/var/cache
+      - ember_vendor:/var/www/html/vendor
+    networks:
+      - shared_services
+
+volumes:
+  ember_cache:
+  ember_vendor:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services

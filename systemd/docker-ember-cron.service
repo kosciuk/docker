@@ -1,0 +1,8 @@
+[Unit]
+Description=Ember - procesar cola de emails pendientes
+Requires=docker.service
+After=docker-ember.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec ember-app php bin/ember.php emails:process-pending
