@@ -22,45 +22,6 @@ Los VirtualHosts ya están definidos en `gateway/sites/liberamerkato.conf` — n
 
 ---
 
-## Deploy
-
-### API (código versionado, no rsync)
-
-```bash
-ssh usuario@IP_DEL_VPS
-cd /var/www/liberamerkato/api
-git pull
-docker compose --env-file /var/www/docker/projects/liberamerkato/env/web.env \
-  -f /var/www/docker/projects/liberamerkato/compose/web.yml exec api composer install --no-dev
-docker compose --env-file /var/www/docker/projects/liberamerkato/env/web.env \
-  -f /var/www/docker/projects/liberamerkato/compose/web.yml exec api vendor/bin/doctrine-migrations migrations:migrate
-```
-
-### App (dist de Vue)
-
-```bash
-npm run build
-rsync -avz --delete dist/ usuario@IP_DEL_VPS:/var/www/liberamerkato/app/
-```
-
-La SPA necesita fallback a `index.html` para el history mode del router. Como el `AllowOverride All` ya está habilitado en la imagen `apache-static`, alcanza con un `.htaccess` dentro del `dist/`:
-
-```apache
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^ index.html [L]
-```
-
-### www (versión estática SEO)
-
-```bash
-rsync -avz --delete /ruta/local/al/sitio-seo/ usuario@IP_DEL_VPS:/var/www/liberamerkato/www/
-```
-
-No hace falta reiniciar contenedores en ninguno de los dos casos — son bind mounts.
-
----
-
 ## Primera vez en el VPS
 
 ```bash
@@ -69,6 +30,7 @@ sudo chown ubuntu:ubuntu /var/www/liberamerkato/app /var/www/liberamerkato/img /
 
 # api se clona con git, no se crea vacío
 git clone git@github.com:ORG/liberamerkato-api.git /var/www/liberamerkato/api
+sudo chown -R ubuntu:ubuntu /var/www/liberamerkato/api
 ```
 
 Crear `/var/www/docker/projects/liberamerkato/env/web.env` a partir de `env/web.env.example` con las credenciales reales.
@@ -90,15 +52,27 @@ docker network create projects_public
 docker compose --env-file /var/www/docker/services/mysql/.env -f /var/www/docker/services/mysql/compose.yml up -d
 ```
 
-Crear la base `liberamerkato` y su usuario si es la primera vez.
+### 3. Base de datos (primera vez)
 
-### 3. Gateway (si no está corriendo)
+```bash
+docker exec -i shared-mysql mysql -u root -pPASS -e "CREATE DATABASE IF NOT EXISTS liberamerkato"
+
+docker exec -i shared-mysql mysql -u root -pPASS -e "
+  CREATE USER IF NOT EXISTS 'liberamerkato_user'@'%' IDENTIFIED BY 'CAMBIAR_PASSWORD';
+  GRANT ALL PRIVILEGES ON liberamerkato.* TO 'liberamerkato_user'@'%';
+  FLUSH PRIVILEGES;
+"
+```
+
+Usar esas mismas credenciales (`DB_USER`/`DB_PASS`) en `env/web.env`.
+
+### 4. Gateway (si no está corriendo)
 
 ```bash
 docker compose -f /var/www/docker/gateway/compose.yml up -d
 ```
 
-### 4. El proyecto
+### 5. El proyecto
 
 ```bash
 docker compose --env-file /var/www/docker/projects/liberamerkato/env/web.env \
@@ -138,3 +112,42 @@ mod_md descarga el certificado en el primer arranque, pero Apache necesita un re
 ```bash
 sudo systemctl restart docker-gateway.service
 ```
+
+---
+
+## Deploy (con el stack ya levantado)
+
+### API (código versionado, no rsync)
+
+```bash
+ssh usuario@IP_DEL_VPS
+cd /var/www/liberamerkato/api
+git pull
+docker compose --env-file /var/www/docker/projects/liberamerkato/env/web.env \
+  -f /var/www/docker/projects/liberamerkato/compose/web.yml exec api composer install --no-dev
+docker compose --env-file /var/www/docker/projects/liberamerkato/env/web.env \
+  -f /var/www/docker/projects/liberamerkato/compose/web.yml exec api vendor/bin/doctrine-migrations migrations:migrate
+```
+
+### App (dist de Vue)
+
+```bash
+npm run build
+rsync -avz --delete dist/ usuario@IP_DEL_VPS:/var/www/liberamerkato/app/
+```
+
+La SPA necesita fallback a `index.html` para el history mode del router. Como el `AllowOverride All` ya está habilitado en la imagen `apache-static`, alcanza con un `.htaccess` dentro del `dist/`:
+
+```apache
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.html [L]
+```
+
+### www (versión estática SEO)
+
+```bash
+rsync -avz --delete /ruta/local/al/sitio-seo/ usuario@IP_DEL_VPS:/var/www/liberamerkato/www/
+```
+
+No hace falta reiniciar contenedores en ninguno de los dos casos — son bind mounts.
