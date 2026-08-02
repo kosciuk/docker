@@ -1,0 +1,71 @@
+name: liberamerkato
+
+services:
+  api:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php84-fpm/Dockerfile
+    container_name: liberamerkato-api
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DB_HOST: ${DB_HOST:-shared-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-liberamerkato}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      COMPOSER_AUTH: ${COMPOSER_AUTH}
+    volumes:
+      - /var/www/liberamerkato/api:/var/www/html
+      - liberamerkato_api_cache:/var/www/html/var/cache
+      - liberamerkato_api_vendor:/var/www/html/vendor
+      - /var/www/liberamerkato/img:/var/www/liberamerkato/img
+    networks:
+      - shared_services
+      - projects_public
+
+  app:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: liberamerkato-app
+    restart: unless-stopped
+    volumes:
+      - /var/www/liberamerkato/app:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  img:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: liberamerkato-img
+    restart: unless-stopped
+    volumes:
+      - /var/www/liberamerkato/img:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  www:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: liberamerkato-www
+    restart: unless-stopped
+    volumes:
+      - /var/www/liberamerkato/www:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+volumes:
+  liberamerkato_api_cache:
+  liberamerkato_api_vendor:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services
+  projects_public:
+    external: true
+    name: projects_public
