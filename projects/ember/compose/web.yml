@@ -18,6 +18,7 @@ services:
       QUEUE_BATCH_SIZE: ${QUEUE_BATCH_SIZE:-50}
       QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-3}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      COMPOSER_AUTH: '{"github-oauth":{"github.com":"${GITHUB_TOKEN}"}}'
     volumes:
       - /var/www/linkedcode/ember.linkedcode.com:/var/www/html
       - ember_cache:/var/www/html/var/cache
