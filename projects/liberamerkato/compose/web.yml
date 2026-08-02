@@ -21,6 +21,7 @@ services:
       - liberamerkato_api_cache:/var/www/html/var/cache
       - liberamerkato_api_vendor:/var/www/html/vendor
       - /var/www/liberamerkato/img:/var/www/liberamerkato/img
+      - /var/www/liberamerkato/logs:/var/www/liberamerkato/logs
     networks:
       - shared_services
       - projects_public
