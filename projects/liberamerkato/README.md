@@ -29,11 +29,15 @@ sudo mkdir -p /var/www/liberamerkato/{app,img,www}
 sudo chown ubuntu:ubuntu /var/www/liberamerkato/app /var/www/liberamerkato/img /var/www/liberamerkato/www
 
 # api se clona con git, no se crea vacío
-git clone git@github.com:ORG/liberamerkato-api.git /var/www/liberamerkato/api
+git clone git@github-linkedcode:liberamerkato/api.git /var/www/liberamerkato/api
 sudo chown -R ubuntu:ubuntu /var/www/liberamerkato/api
 ```
 
-Crear `/var/www/docker/projects/liberamerkato/env/web.env` a partir de `env/web.env.example` con las credenciales reales.
+```bash
+cp /var/www/docker/projects/liberamerkato/env/web.env.example /var/www/docker/projects/liberamerkato/env/web.env
+```
+
+Editar `env/web.env` con las credenciales reales (`DB_USER`/`DB_PASS`, `COMPOSER_AUTH`).
 
 ---
 
@@ -123,10 +127,8 @@ sudo systemctl restart docker-gateway.service
 ssh usuario@IP_DEL_VPS
 cd /var/www/liberamerkato/api
 git pull
-docker compose --env-file /var/www/docker/projects/liberamerkato/env/web.env \
-  -f /var/www/docker/projects/liberamerkato/compose/web.yml exec api composer install --no-dev
-docker compose --env-file /var/www/docker/projects/liberamerkato/env/web.env \
-  -f /var/www/docker/projects/liberamerkato/compose/web.yml exec api vendor/bin/doctrine-migrations migrations:migrate
+docker exec liberamerkato-api composer install --no-dev
+docker exec liberamerkato-api bin/migrate
 ```
 
 ### App (dist de Vue)
