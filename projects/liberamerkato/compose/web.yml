@@ -22,6 +22,7 @@ services:
       - liberamerkato_api_vendor:/var/www/html/vendor
       - /var/www/liberamerkato/img:/var/www/liberamerkato/img
       - /var/www/liberamerkato/logs:/var/www/liberamerkato/logs
+      - /var/www/docker/projects/liberamerkato/config/uploads.ini:/usr/local/etc/php/conf.d/zz-uploads.ini:ro
     networks:
       - shared_services
       - projects_public
