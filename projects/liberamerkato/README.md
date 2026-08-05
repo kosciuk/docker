@@ -70,6 +70,18 @@ docker exec -i shared-mysql mysql -u root -pPASS -e "
 
 Usar esas mismas credenciales (`DB_USER`/`DB_PASS`) en `env/web.env`.
 
+#### Importar un schema/dump completo
+
+```bash
+docker exec -i shared-mysql mysql -u liberamerkato_user -pPASSWORD liberamerkato < dump.sql
+```
+
+O directo desde la máquina local, sin copiar el dump al VPS antes:
+
+```bash
+mysqldump -u user -p liberamerkato_local | ssh usuario@IP_DEL_VPS "docker exec -i shared-mysql mysql -u liberamerkato_user -pPASSWORD liberamerkato"
+```
+
 ### 4. Gateway (si no está corriendo)
 
 ```bash

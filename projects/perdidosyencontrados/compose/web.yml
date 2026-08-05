@@ -1,0 +1,73 @@
+name: perdidosyencontrados
+
+services:
+  api:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php84-fpm/Dockerfile
+    container_name: perdidosyencontrados-api
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DB_HOST: ${DB_HOST:-shared-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-perdidosyencontrados}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      COMPOSER_AUTH: ${COMPOSER_AUTH}
+    volumes:
+      - /var/www/perdidosyencontrados/api:/var/www/html
+      - perdidosyencontrados_api_cache:/var/www/html/var/cache
+      - perdidosyencontrados_api_vendor:/var/www/html/vendor
+      - /var/www/perdidosyencontrados/img:/var/www/perdidosyencontrados/img
+      - /var/www/perdidosyencontrados/logs:/var/www/perdidosyencontrados/logs
+      - /var/www/docker/projects/perdidosyencontrados/config/uploads.ini:/usr/local/etc/php/conf.d/zz-uploads.ini:ro
+    networks:
+      - shared_services
+      - projects_public
+
+  app:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: perdidosyencontrados-app
+    restart: unless-stopped
+    volumes:
+      - /var/www/perdidosyencontrados/app:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  img:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: perdidosyencontrados-img
+    restart: unless-stopped
+    volumes:
+      - /var/www/perdidosyencontrados/img:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  www:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: perdidosyencontrados-www
+    restart: unless-stopped
+    volumes:
+      - /var/www/perdidosyencontrados/www:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+volumes:
+  perdidosyencontrados_api_cache:
+  perdidosyencontrados_api_vendor:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services
+  projects_public:
+    external: true
+    name: projects_public

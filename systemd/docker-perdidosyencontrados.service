@@ -1,0 +1,16 @@
+[Unit]
+Description=Docker Compose PerdidosYEncontrados web
+Requires=docker.service docker-mysql.service
+After=docker.service docker-mysql.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/var/www/docker
+ExecStart=/usr/bin/docker compose --env-file /var/www/docker/projects/perdidosyencontrados/env/web.env -f /var/www/docker/projects/perdidosyencontrados/compose/web.yml up -d --build
+ExecStop=/usr/bin/docker compose --env-file /var/www/docker/projects/perdidosyencontrados/env/web.env -f /var/www/docker/projects/perdidosyencontrados/compose/web.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
