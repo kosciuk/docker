@@ -1,0 +1,63 @@
+name: enforos
+
+services:
+  api:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php84-fpm/Dockerfile
+    container_name: enforos-api
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DB_HOST: ${DB_HOST:-shared-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-enforos}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      COMPOSER_AUTH: ${COMPOSER_AUTH}
+    volumes:
+      - /var/www/enforos/api:/var/www/html
+      - enforos_api_cache:/var/www/html/var/cache
+      - enforos_api_vendor:/var/www/html/vendor
+      - /var/www/enforos/logs:/var/www/enforos/logs
+    networks:
+      - shared_services
+      - projects_public
+
+  app:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: enforos-app
+    restart: unless-stopped
+    volumes:
+      - /var/www/enforos/app:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  www:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: enforos-www
+    restart: unless-stopped
+    volumes:
+      - /var/www/docker/projects/enforos/config/www-redirect.conf:/usr/local/apache2/conf/extra/redirect.conf:ro
+    command: >
+      sh -c "echo 'Include conf/extra/redirect.conf' >> /usr/local/apache2/conf/httpd.conf
+      && httpd-foreground"
+    networks:
+      - projects_public
+
+volumes:
+  enforos_api_cache:
+  enforos_api_vendor:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services
+  projects_public:
+    external: true
+    name: projects_public
