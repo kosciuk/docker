@@ -23,7 +23,7 @@ RUN set -eux; \
         zip; \
     pecl install apcu; \
     docker-php-ext-enable apcu; \
-    a2enmod rewrite headers expires proxy proxy_fcgi; \
+    a2enmod rewrite headers expires proxy proxy_fcgi remoteip; \
     echo "ServerName localhost" >> /etc/apache2/apache2.conf; \
     rm -rf /var/lib/apt/lists/*; \
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; \
