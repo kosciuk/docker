@@ -118,6 +118,56 @@ else
     fail "no se encontró $APP_CONFIG"
 fi
 
+# La config efectiva es el merge de common.php con config.php, así que grepear
+# los archivos no alcanza: se le pregunta a la app por el valor que realmente usa.
+section "Cookie de sesión"
+
+cookie=$(docker exec "$CONTAINER" php -r '
+require "/var/www/html/vendor/autoload.php";
+$c = Linkedcode\NotEnv\Loader::reload("/var/www/html");
+foreach (["secure", "httponly", "samesite"] as $k) {
+    printf("%s=%s\n", $k, var_export($c->get("cookie.$k", null), true));
+}' 2>/dev/null)
+
+if [ -z "$cookie" ]; then
+    warn "no se pudo leer la config de cookie - verificar a mano"
+else
+    for flag in secure httponly; do
+        value=$(printf '%s\n' "$cookie" | sed -n "s/^${flag}=//p")
+        case "$value" in
+            true)  ok "cookie $flag activo" ;;
+            false) fail "cookie $flag en false (en producción debe ser true)" ;;
+            *)     fail "cookie $flag sin definir -> la cookie sale sin ese flag" ;;
+        esac
+    done
+
+    samesite=$(printf '%s\n' "$cookie" | sed -n "s/^samesite=//p")
+    case "$samesite" in
+        "'Lax'"|"'Strict'") ok "cookie samesite $samesite" ;;
+        *)                  warn "cookie samesite $samesite" ;;
+    esac
+fi
+
+# Loader cachea el merge y no compara fechas: si el caché es más viejo que los
+# archivos, la app sigue sirviendo la config anterior aunque el deploy ya pasó.
+section "Caché de config"
+
+stale=$(docker exec "$CONTAINER" sh -c '
+cache=/var/www/html/var/cache/config.php
+[ -f "$cache" ] || { echo "sin-cache"; exit 0; }
+for f in /var/www/html/config/common.php /var/www/html/config/config.php; do
+    [ "$f" -nt "$cache" ] && { echo "rancio"; exit 0; }
+done
+echo "fresco"' 2>/dev/null)
+
+case "$stale" in
+    fresco)    ok "el caché está al día" ;;
+    sin-cache) ok "sin caché: se reconstruye en el próximo request" ;;
+    rancio)    fail "var/cache/config.php es más viejo que la config -> borralo"
+               echo "           docker exec $CONTAINER rm -f /var/www/html/var/cache/config.php" ;;
+    *)         warn "no se pudo revisar el caché de config" ;;
+esac
+
 # Las claves OAuth no deben ser legibles por otros usuarios del sistema.
 for key in private.key public.key; do
     path="/var/www/linkedcode/auth.linkedcode.com/config/$key"
