@@ -57,8 +57,12 @@ else
     fail "falta RemoteIPTrustedProxy -> el header X-Forwarded-For sería falseable"
 fi
 
-# Prueba de verdad: pedir desde el gateway con un XFF conocido y ver qué IP
-# termina viendo PHP. Es lo único que confirma que la cadena entera funciona.
+# Prueba de verdad: mandar un XFF conocido y ver qué IP termina viendo PHP.
+# Corre curl DESDE linkedcode-auth contra sí mismo (127.0.0.1): shared-gateway
+# es la imagen httpd:2.4 oficial y no trae curl, así que probar desde ahí falla
+# por falta de herramienta, no por un problema real. Pegarle a localhost prueba
+# lo mismo -que Apache reescriba REMOTE_ADDR a partir del header- sin depender
+# de qué imagen use el gateway ni de la resolución DNS entre contenedores.
 section "Prueba de extremo a extremo"
 
 probe_dir="/var/www/html/public"
@@ -67,8 +71,8 @@ probe="_ip_probe_$$.php"
 if docker exec "$CONTAINER" sh -c \
     "printf '<?php echo \$_SERVER[\"REMOTE_ADDR\"];' > $probe_dir/$probe" 2>/dev/null; then
 
-    seen=$(docker exec "$GATEWAY" sh -c \
-        "curl -s -H 'X-Forwarded-For: 203.0.113.55' http://$CONTAINER/$probe" 2>/dev/null)
+    seen=$(docker exec "$CONTAINER" sh -c \
+        "curl -s -H 'X-Forwarded-For: 203.0.113.55' http://127.0.0.1/$probe" 2>/dev/null)
 
     docker exec "$CONTAINER" rm -f "$probe_dir/$probe" 2>/dev/null
 
@@ -77,7 +81,7 @@ if docker exec "$CONTAINER" sh -c \
             ok "REMOTE_ADDR = IP real del visitante"
             ;;
         "")
-            warn "no hubo respuesta (¿el gateway resuelve '$CONTAINER'?) - verificar a mano"
+            warn "curl no disponible en $CONTAINER o sin respuesta - verificar a mano"
             ;;
         *)
             fail "REMOTE_ADDR = $seen (debería ser 203.0.113.55)"
