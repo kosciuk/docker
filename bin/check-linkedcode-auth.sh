@@ -58,21 +58,33 @@ else
 fi
 
 # Prueba de verdad: mandar un XFF conocido y ver qué IP termina viendo PHP.
-# Corre curl DESDE linkedcode-auth contra sí mismo (127.0.0.1): shared-gateway
-# es la imagen httpd:2.4 oficial y no trae curl, así que probar desde ahí falla
-# por falta de herramienta, no por un problema real. Pegarle a localhost prueba
-# lo mismo -que Apache reescriba REMOTE_ADDR a partir del header- sin depender
-# de qué imagen use el gateway ni de la resolución DNS entre contenedores.
+# Corre curl DESDE linkedcode-auth contra sí mismo, pero por su IP en la red
+# Docker (no 127.0.0.1): RemoteIPTrustedProxy sólo confía en los rangos
+# privados 172.16/12, 192.168/16 y 10/8, y loopback no cae en ninguno, así que
+# pegarle a 127.0.0.1 haría fallar la prueba aunque la config esté bien -es
+# la propia prueba la que quedaría fuera de lo que la config declara confiable,
+# no un problema real. Usar la IP de la red sí reproduce cómo llega la conexión
+# desde shared-gateway en producción (shared-gateway tampoco trae curl, ver
+# commit anterior).
 section "Prueba de extremo a extremo"
 
 probe_dir="/var/www/html/public"
 probe="_ip_probe_$$.php"
 
-if docker exec "$CONTAINER" sh -c \
+# linkedcode-auth está en dos redes (shared_services para MySQL, projects_public
+# para el gateway): iterar todas las redes con {{range}} las concatena sin
+# separador y arma una IP inválida. Se pide la de projects_public en concreto,
+# que es por donde en verdad llega el tráfico del gateway.
+self_ip=$(docker inspect "$CONTAINER" \
+    --format '{{(index .NetworkSettings.Networks "projects_public").IPAddress}}' 2>/dev/null)
+
+if [ -z "$self_ip" ]; then
+    warn "no se pudo obtener la IP de $CONTAINER en la red Docker - salteado"
+elif docker exec "$CONTAINER" sh -c \
     "printf '<?php echo \$_SERVER[\"REMOTE_ADDR\"];' > $probe_dir/$probe" 2>/dev/null; then
 
     seen=$(docker exec "$CONTAINER" sh -c \
-        "curl -s -H 'X-Forwarded-For: 203.0.113.55' http://127.0.0.1/$probe" 2>/dev/null)
+        "curl -s -H 'X-Forwarded-For: 203.0.113.55' http://$self_ip/$probe" 2>/dev/null)
 
     docker exec "$CONTAINER" rm -f "$probe_dir/$probe" 2>/dev/null
 
