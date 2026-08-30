@@ -184,18 +184,29 @@ case "$stale" in
     *)         warn "no se pudo revisar el caché de config" ;;
 esac
 
-# Las claves OAuth no deben ser legibles por otros usuarios del sistema.
+# Las claves OAuth no deben ser legibles por otros usuarios del sistema, pero
+# eso no alcanza: hay que probar que el proceso del contenedor (www-data) las
+# puede leer. 600 con el dueño equivocado (típico si el archivo se creó desde
+# el host) es ilegible para www-data y la stat del host no lo detecta -pasó
+# exactamente eso: 600 correcto, dueño incorrecto, la app rota con Permission
+# denied.
 for key in private.key public.key; do
     path="/var/www/linkedcode/auth.linkedcode.com/config/$key"
-    if [ -f "$path" ]; then
-        perms=$(stat -c '%a' "$path")
-        if [ "$key" = "private.key" ] && [ "$perms" != "600" ] && [ "$perms" != "400" ]; then
-            fail "$key con permisos $perms (se espera 600)"
-        else
-            ok "$key presente ($perms)"
-        fi
-    else
+    if [ ! -f "$path" ]; then
         fail "falta $path"
+        continue
+    fi
+
+    perms=$(stat -c '%a' "$path")
+    owner=$(stat -c '%U:%G' "$path" 2>/dev/null || echo '?')
+
+    if [ "$key" = "private.key" ] && [ "$perms" != "600" ] && [ "$perms" != "400" ]; then
+        fail "$key con permisos $perms (se espera 600), dueño $owner"
+    elif ! docker exec -u www-data "$CONTAINER" test -r "/var/www/html/config/$key" 2>/dev/null; then
+        fail "$key ($perms, dueño $owner en el host) no es legible por www-data en el contenedor"
+        echo "           fix: docker exec -u root $CONTAINER chown www-data:www-data /var/www/html/config/$key"
+    else
+        ok "$key presente ($perms) y legible por www-data"
     fi
 done
 
