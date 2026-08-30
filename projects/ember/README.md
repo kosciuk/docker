@@ -59,6 +59,18 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now docker-ember-cron.timer
 ```
 
+Si se modifica alguna de las units, recargar:
+
+```bash
+sudo cp /var/www/docker/systemd/docker-ember-cron.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl restart docker-ember-cron.timer
+```
+
+El cron es la **red de seguridad**: los proyectos con `send_immediately = 1`
+(recuperar contraseña, verificación) envían en el mismo request y no dependen
+de él. El timer levanta lo que haya quedado pendiente si ese envío falla.
+
 ---
 
 ## Conectar otro proyecto a Ember

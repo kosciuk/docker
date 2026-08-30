@@ -1,7 +1,12 @@
 [Unit]
 Description=Ember - procesar cola de emails pendientes
+# BindsTo + After: si el contenedor no está levantado, esta unit no corre en
+# lugar de fallar cada minuto con "No such container: ember-app" y llenar el
+# journal sin procesar nada. docker-ember.service es oneshot con
+# RemainAfterExit=yes, así que refleja si el compose está arriba.
 Requires=docker.service
-After=docker-ember.service
+BindsTo=docker-ember.service
+After=docker.service docker-ember.service
 
 [Service]
 Type=oneshot
