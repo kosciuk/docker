@@ -37,7 +37,18 @@ sudo chown -R ubuntu:ubuntu /var/www/liberamerkato/api
 cp /var/www/docker/projects/liberamerkato/env/web.env.example /var/www/docker/projects/liberamerkato/env/web.env
 ```
 
-Editar `env/web.env` con las credenciales reales (`DB_USER`/`DB_PASS`, `COMPOSER_AUTH`).
+Editar `env/web.env` con el `COMPOSER_AUTH` real.
+
+La conexión a la base **no va en el env**: la API la lee de `api/config/config.php`, que no se versiona. En el VPS ese archivo tiene que apuntar a `shared-mysql`:
+
+```php
+'db' => [
+    'host'     => 'shared-mysql',
+    'dbname'   => 'liberamerkato',
+    'user'     => '...',
+    'password' => '...',
+],
+```
 
 ---
 
@@ -81,7 +92,7 @@ docker exec -i shared-mysql mysql -u root -pPASS -e "
 "
 ```
 
-Usar esas mismas credenciales (`DB_USER`/`DB_PASS`) en `env/web.env`.
+Usar esas mismas credenciales en `api/config/config.php` (ver arriba), no en el env.
 
 #### Importar un schema/dump completo
 

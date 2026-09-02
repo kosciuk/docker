@@ -7,13 +7,11 @@ services:
       dockerfile: images/php84-fpm/Dockerfile
     container_name: perdidosyencontrados-api
     restart: unless-stopped
+    # La conexión a la base NO sale de variables de entorno: config/common.php
+    # la fija y se pisa desde config/config.php, que no se versiona. Pasar DB_*
+    # acá era ruido: la app nunca las leyó.
     environment:
       APP_ENV: ${APP_ENV:-production}
-      DB_HOST: ${DB_HOST:-shared-mysql}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_NAME: ${DB_NAME:-perdidosyencontrados}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
       COMPOSER_AUTH: ${COMPOSER_AUTH}
     volumes:
