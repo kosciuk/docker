@@ -10,6 +10,20 @@ services:
       - /var/www/docker/gateway/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
       - /var/www/docker/gateway/sites:/usr/local/apache2/conf/sites:ro
       - gateway_md:/usr/local/apache2/md
+      # Logs por proyecto. Cada vhost escribe su ErrorLog/CustomLog acá, en vez
+      # de mezclar los 9 proyectos en el log genérico del gateway (ver
+      # logging.xml). Montados RW a propósito: Apache abre estos archivos como
+      # root al arrancar, antes de bajar a daemon, así que alcanza con que el
+      # directorio exista en el host.
+      - /var/www/liberamerkato/logs:/var/www/liberamerkato/logs
+      - /var/www/enforos/logs:/var/www/enforos/logs
+      - /var/www/cooperativismoabierto/logs:/var/www/cooperativismoabierto/logs
+      - /var/www/partidodelasoledad/logs:/var/www/partidodelasoledad/logs
+      - /var/www/perdidosyencontrados/logs:/var/www/perdidosyencontrados/logs
+      - /var/www/granhermano/logs:/var/www/granhermano/logs
+      - /var/www/zurdosanonimos/logs:/var/www/zurdosanonimos/logs
+      - /var/www/kosciuk/logs:/var/www/kosciuk/logs
+      - /var/www/linkedcode/logs:/var/www/linkedcode/logs
     networks:
       - projects_public
 
