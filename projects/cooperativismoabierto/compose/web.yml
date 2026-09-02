@@ -1,20 +1,76 @@
 name: cooperativismoabierto
 
 services:
-  web:
-    image: httpd:2.4
-    container_name: cooperativismoabierto-web
+  api:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php84-fpm/Dockerfile
+    container_name: cooperativismoabierto-api
     restart: unless-stopped
-    command: >
-      sh -c "echo 'Include conf/extra/rewrite.conf' >> /usr/local/apache2/conf/httpd.conf
-      && httpd-foreground"
+    # Ojo: a diferencia de enforos/liberamerkato, la API de este proyecto NO
+    # arma la conexión con estas variables. config/common.php fija host
+    # 'localhost' y dbname 'cooperativismoabierto' con user/password null, y eso se pisa desde
+    # config/config.php (que no se versiona). Estas variables quedan para
+    # APP_ENV / TZ / COMPOSER_AUTH y para el JWT; los datos de la base van
+    # en config.php con host: shared-mysql.
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      COMPOSER_AUTH: ${COMPOSER_AUTH}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-https://api.cooperativismoabierto.com.ar}
     volumes:
-      - /var/www/cooperativismoabierto/www:/usr/local/apache2/htdocs
-      - /var/www/docker/projects/cooperativismoabierto/config/rewrite.conf:/usr/local/apache2/conf/extra/rewrite.conf:ro
+      - /var/www/cooperativismoabierto/api:/var/www/html
+      - cooperativismoabierto_api_cache:/var/www/html/var/cache
+      - cooperativismoabierto_api_vendor:/var/www/html/vendor
+      - /var/www/cooperativismoabierto/img:/var/www/cooperativismoabierto/img
+      - /var/www/cooperativismoabierto/logs:/var/www/cooperativismoabierto/logs
+      - /var/www/docker/projects/cooperativismoabierto/config/uploads.ini:/usr/local/etc/php/conf.d/zz-uploads.ini:ro
+    networks:
+      - shared_services
+      - projects_public
+
+  app:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: cooperativismoabierto-app
+    restart: unless-stopped
+    volumes:
+      - /var/www/cooperativismoabierto/app/dist:/usr/local/apache2/htdocs
     networks:
       - projects_public
 
+  img:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: cooperativismoabierto-img
+    restart: unless-stopped
+    volumes:
+      - /var/www/cooperativismoabierto/img:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  www:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: cooperativismoabierto-www
+    restart: unless-stopped
+    volumes:
+      - /var/www/cooperativismoabierto/www:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+volumes:
+  cooperativismoabierto_api_cache:
+  cooperativismoabierto_api_vendor:
+
 networks:
+  shared_services:
+    external: true
+    name: shared_services
   projects_public:
     external: true
     name: projects_public
