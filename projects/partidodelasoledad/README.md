@@ -21,23 +21,6 @@ El contenedor `api` también monta `/var/www/partidodelasoledad/img` (mismo path
 
 Los VirtualHosts ya están definidos en `gateway/sites/partidodelasoledad.conf` — no hay que configurar nada más ahí.
 
-## Conexión a la base — atención
-
-A diferencia de enforos y liberamerkato, **la API de este proyecto no arma la conexión con las variables `DB_*` del entorno**. `config/common.php` fija `host: localhost`, `dbname: pdls` y `user`/`password` en `null`, y eso se pisa desde `config/config.php`, que está en `.gitignore`.
-
-En el VPS ese archivo tiene que apuntar al contenedor de MySQL:
-
-```php
-'db' => [
-    'host'     => 'shared-mysql',
-    'dbname'   => 'pdls',
-    'user'     => 'pdls_user',
-    'password' => '...',
-],
-```
-
-El `env/web.env` sí se usa para `APP_ENV`, `TZ`, `JWT_SECRET` y `COMPOSER_AUTH`.
-
 ---
 
 ## Levantar el proyecto
@@ -49,9 +32,9 @@ El `env/web.env` sí se usa para `APP_ENV`, `TZ`, `JWT_SECRET` y `COMPOSER_AUTH`
 /var/www/docker/bin/setup-partidodelasoledad.sh --build   # además reconstruye las imágenes
 ```
 
-Corre en dos fases. Primero chequea, sin tocar nada: env completo, Docker accesible, `shared-mysql` y `shared-gateway` arriba, `config/config.php` presente y apuntando a `shared-mysql`, base accesible, y api/app clonados. Si algo falla, corta ahí sin haber modificado nada y muestra **todos** los problemas juntos. Recién después crea directorios, redes y levanta los contenedores.
+Corre en dos fases. Primero chequea, sin tocar nada: env completo, Docker accesible, `shared-mysql` y `shared-gateway` arriba, base accesible con las credenciales del env, y la API clonada. Si algo falla, corta ahí sin haber modificado nada y muestra **todos** los problemas juntos. Recién después crea directorios, redes y levanta los contenedores.
 
-No crea la base de datos, `config.php` ni el DNS. Para eso, seguir el camino largo.
+No crea la base de datos ni el DNS. Para eso, seguir el camino largo.
 
 ### Camino largo
 
@@ -71,8 +54,7 @@ cp /var/www/docker/projects/partidodelasoledad/env/web.env.example \
    /var/www/docker/projects/partidodelasoledad/env/web.env
 ```
 
-Editar `env/web.env` con los valores reales (`JWT_SECRET`, `COMPOSER_AUTH`), y crear
-`/var/www/partidodelasoledad/api/config/config.php` con los datos de la base (ver arriba).
+Editar `env/web.env` con los valores reales (`JWT_SECRET`, `DB_USER`/`DB_PASS`, `COMPOSER_AUTH`).
 
 #### 2. Redes (si no existen)
 
@@ -93,7 +75,7 @@ docker exec -i shared-mysql mysql -u root -pPASS -e "
 "
 ```
 
-Usar esas credenciales en `config/config.php`.
+Usar esas credenciales en `env/web.env`.
 
 #### 4. Gateway (si no está corriendo)
 

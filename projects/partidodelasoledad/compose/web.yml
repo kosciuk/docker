@@ -15,6 +15,11 @@ services:
     # en config.php con host: shared-mysql.
     environment:
       APP_ENV: ${APP_ENV:-production}
+      DB_HOST: ${DB_HOST:-shared-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-pdls}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
       COMPOSER_AUTH: ${COMPOSER_AUTH}
       JWT_SECRET: ${JWT_SECRET}
