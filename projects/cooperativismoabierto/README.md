@@ -12,7 +12,7 @@ Sitio con 4 subdominios:
 Archivos en el VPS:
 
 - API: `/var/www/cooperativismoabierto/api`
-- App (dist): `/var/www/cooperativismoabierto/app/dist`
+- App (dist): `/var/www/cooperativismoabierto/app`
 - Uploads: `/var/www/cooperativismoabierto/img`
 - Sitio estático SEO: `/var/www/cooperativismoabierto/www`
 - Logs: `/var/www/cooperativismoabierto/logs`
@@ -58,13 +58,12 @@ No crea la base de datos, `config.php` ni el DNS. Para eso, seguir el camino lar
 #### 1. Primera vez en el VPS
 
 ```bash
-sudo mkdir -p /var/www/cooperativismoabierto/{img,www,logs}
-sudo chown ubuntu:ubuntu /var/www/cooperativismoabierto/{img,www,logs}
+sudo mkdir -p /var/www/cooperativismoabierto/{app,img,www,logs}
+sudo chown ubuntu:ubuntu /var/www/cooperativismoabierto/{app,img,www,logs}
 
-# api y app se clonan con git, no se crean vacíos
+# api se clona con git, no se crea vacío. app se llena con el rsync del deploy.
 git clone git@github.com:cooperativismoabierto/api.git /var/www/cooperativismoabierto/api
-git clone git@github.com:cooperativismoabierto/app.git /var/www/cooperativismoabierto/app
-sudo chown -R ubuntu:ubuntu /var/www/cooperativismoabierto/{api,app}
+sudo chown -R ubuntu:ubuntu /var/www/cooperativismoabierto/api
 ```
 
 ```bash
@@ -160,7 +159,7 @@ docker exec cooperativismoabierto-api bin/migrate
 
 ```bash
 npm run build
-rsync -avz --delete dist/ usuario@IP_DEL_VPS:/var/www/cooperativismoabierto/app/dist/
+rsync -avz --delete dist/ usuario@IP_DEL_VPS:/var/www/cooperativismoabierto/app/
 ```
 
 La SPA necesita fallback a `index.html` para el history mode del router. Como `AllowOverride All` ya está habilitado en la imagen `apache-static`, alcanza con un `.htaccess` dentro del `dist/`:
