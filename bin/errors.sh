@@ -12,7 +12,19 @@
 # imprime la primera línea (mensaje + archivo), nunca el stack trace, y las
 # repeticiones se cuentan en vez de repetirse.
 #
-# SÓLO LEE: docker logs y nada más. Se puede correr en producción.
+# Mira las tres capas que define la convención de logging (ver logging.xml),
+# porque cada una ve lo que las otras no pueden ver:
+#
+#   app.log     Monolog. Excepciones de dominio con contexto. Es la capa útil:
+#               un 500 mapeado por ProblemDetailsMiddleware llega acá y NUNCA
+#               a Apache, porque la respuesta sale limpia.
+#   error.log   Apache/PHP-FPM. Lo que pasa ANTES de llegar a la app: fatales,
+#               parse errors, fcgi caído. Un fatal mata el proceso, así que
+#               nunca llega a Monolog.
+#   docker logs stdout del contenedor. Sólo como respaldo: lo que muere tan
+#               temprano que no alcanza a escribir a ningún archivo.
+#
+# SÓLO LEE. Se puede correr en producción con el sitio andando.
 #
 set -uo pipefail
 
@@ -44,13 +56,18 @@ list_projects() {
 
 usage() {
     cat <<EOF
-Errores recientes de los contenedores de cada proyecto, agrupados.
+Errores recientes de cada proyecto, agrupados y sin stack trace.
 
   $(basename "$0")                  todos los proyectos, últimas 24h
   $(basename "$0") <proyecto>       sólo uno
   $(basename "$0") <proyecto> 2h    otra ventana (30m, 2h, 7d...)
-  $(basename "$0") --all            sin agrupar: cada ocurrencia con su hora
+  $(basename "$0") --all            sin agrupar: cada ocurrencia
   $(basename "$0") --help           esta ayuda
+
+Se leen las tres capas de log de cada proyecto:
+  app.log      excepciones de la app (Monolog) — la capa con más contexto
+  error.log    Apache / PHP-FPM — fatales y errores previos a la app
+  docker logs  respaldo, para lo que muere antes de escribir a archivo
 
 Proyectos disponibles:
 EOF
@@ -60,10 +77,8 @@ EOF
     done
     cat <<EOF
 
-Se imprime una línea por error (mensaje y archivo), sin stack trace. Para ver
-el traceback completo de uno puntual:
-
-  docker logs --since 1h <contenedor> | grep -A 20 '<fragmento del mensaje>'
+Para el traceback completo de un error puntual:
+  grep -A 20 '<fragmento del mensaje>' /var/www/<proyecto>/logs/app.log
 EOF
 }
 
@@ -79,21 +94,34 @@ if [ -n "$ONLY" ] && [ ! -f "$DOCKER/bin/projects/$ONLY.conf" ]; then
     exit 2
 fi
 
-if ! docker info >/dev/null 2>&1; then
-    echo "No se puede hablar con el demonio de Docker."
-    echo "¿está corriendo? ¿el usuario está en el grupo docker?"
-    exit 1
-fi
+ok()   { echo "  [ ok ]   $1"; }
+bad()  { echo "  [FALLA]  $1"; }
+hmm()  { echo "  [ ojo ]  $1"; }
+info() { echo "           $1"; }
 
-# Qué cuenta como error. Deliberadamente no incluye "warning" ni "notice": esto
-# es para encontrar lo roto, no para auditar el código.
-PATTERN='PHP (Fatal|Parse) error|Uncaught [A-Za-z\\]*(Exception|Error)|\[error\]|\[crit\]|\[alert\]|\[emerg\]|Segmentation fault|Allowed memory size'
+# Convierte la ventana (30m, 2h, 7d) a minutos, para `find -mmin`.
+since_minutes() {
+    local n="${SINCE%[smhd]}" u="${SINCE: -1}"
+    case "$u" in
+        s) echo $(( n / 60 + 1 )) ;;
+        m) echo "$n" ;;
+        h) echo $(( n * 60 )) ;;
+        d) echo $(( n * 1440 )) ;;
+        *) echo 1440 ;;
+    esac
+}
 
-# Las líneas de continuación de un stack trace de PHP y las de mod_php que
-# repiten el mismo evento. Sacarlas es lo que hace legible la salida.
-NOISE='^[[:space:]]*#[0-9]+|^[[:space:]]*thrown in|Stack trace:|^[[:space:]]*\{main\}'
+# Qué cuenta como error en cada capa. Separados a propósito: el formato de
+# Monolog (app.ERROR:) y el de Apache ([error]) no se parecen en nada, y un
+# patrón único obligaría a aflojarlo hasta que empiece a traer ruido.
+PATTERN_APP='\.(ERROR|CRITICAL|ALERT|EMERGENCY):'
+PATTERN_SYS='PHP (Fatal|Parse) error|Uncaught [A-Za-z\\]*(Exception|Error)|\[(error|crit|alert|emerg)\]|Segmentation fault|Allowed memory size'
 
-# Deja el mensaje en una sola línea corta y sin las partes que cambian entre
+# Líneas de continuación de un stack trace, y el ruido de dev que no es un
+# problema del sitio (Xdebug intentando conectarse a un cliente que no está).
+NOISE='^[[:space:]]*#[0-9]+|^[[:space:]]*thrown in|Stack trace:|^[[:space:]]*\{main\}|Xdebug: \[Step Debug\]'
+
+# Deja el mensaje en una línea corta y sin las partes que cambian entre
 # ocurrencias, para que dos veces el mismo error agrupen juntos.
 normalize() {
     sed -E \
@@ -101,45 +129,115 @@ normalize() {
         -e 's/\[(pid|client) [^]]*\] //g' \
         -e 's/^[A-Z][a-z]{2} [A-Z][a-z]{2} [0-9 ]+[0-9:.]+ [0-9]{4} //' \
         -e 's/, referer:.*$//' \
+        -e 's/"(exception|trace)":".*$//' \
         -e 's/0x[0-9a-f]+/0xADDR/g' \
-        -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9:.]+/FECHA/g' \
+        -e 's/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/UUID/g' \
+        -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9:.+]+/FECHA/g' \
         -e 's/[[:space:]]+/ /g' \
         -e 's/^ //; s/ $//'
 }
 
-report_container() {
-    local c="$1" raw n
-    raw=$(docker logs --since "$SINCE" "$c" 2>&1 \
-          | grep -E "$PATTERN" \
-          | grep -Ev "$NOISE") || true
-
-    if [ -z "$raw" ]; then
-        echo "  [ ok ]   $c — sin errores en $SINCE"
-        return
-    fi
-
-    n=$(printf '%s\n' "$raw" | wc -l)
-    echo "  [FALLA]  $c — $n línea(s) con error en $SINCE"
+# Imprime las líneas ya filtradas: agrupadas con su contador, o todas.
+render() {
+    local raw="$1"
 
     if [ "$GROUP" -eq 0 ]; then
         printf '%s\n' "$raw" | cut -c1-160 | sed 's/^/             /'
         return
     fi
 
-    # Agrupado: cuántas veces y el mensaje una sola vez. sort -rn deja arriba
-    # el que más se repite, que casi siempre es el que hay que arreglar.
     printf '%s\n' "$raw" \
         | normalize \
         | sort | uniq -c | sort -rn \
-        | head -12 \
+        | head -10 \
         | while read -r count msg; do
               printf '             %4sx  %s\n' "$count" "$(printf '%s' "$msg" | cut -c1-140)"
           done
 
     local distintos
     distintos=$(printf '%s\n' "$raw" | normalize | sort -u | wc -l)
-    [ "$distintos" -gt 12 ] && echo "             ... y $((distintos - 12)) mensaje(s) distinto(s) más"
+    [ "$distintos" -gt 10 ] && echo "             ... y $((distintos - 10)) mensaje(s) distinto(s) más"
 }
+
+# Una capa basada en archivo (app.log / error.log).
+#
+# Se filtra por antigüedad del archivo, no por la fecha de cada línea: los dos
+# formatos fechan distinto y parsearlos sería frágil. La consecuencia hay que
+# tenerla presente: si el archivo se tocó dentro de la ventana, se reportan
+# TODAS sus líneas con error, también las más viejas. Para eso está el mtime en
+# el encabezado de cada capa.
+report_file_layer() {
+    local label="$1" file="$2" pattern="$3" mins="$4"
+
+    if [ ! -f "$file" ]; then
+        info "$label: no existe ($file)"
+        return
+    fi
+
+    if [ ! -r "$file" ]; then
+        hmm "$label: sin permiso de lectura — probá con sudo"
+        return
+    fi
+
+    local mtime
+    mtime=$(date -r "$file" '+%Y-%m-%d %H:%M' 2>/dev/null)
+
+    if [ -z "$(find "$file" -mmin "-${mins}" 2>/dev/null)" ]; then
+        info "$label: sin escrituras en $SINCE (última: ${mtime:-?})"
+        return
+    fi
+
+    local raw n
+    raw=$(grep -E "$pattern" "$file" 2>/dev/null | grep -Ev "$NOISE") || true
+
+    if [ -z "$raw" ]; then
+        ok "$label: sin errores (última escritura: ${mtime:-?})"
+        return
+    fi
+
+    n=$(printf '%s\n' "$raw" | wc -l)
+    bad "$label: $n línea(s) con error — última escritura: ${mtime:-?}"
+    render "$raw"
+}
+
+# La capa de respaldo. Sólo interesa lo que no llegó a ningún archivo, así que
+# un contenedor sin errores en stdout no se reporta: sería ruido.
+report_docker_layer() {
+    local c="$1" logs raw n
+
+    local state
+    state=$(docker inspect -f '{{.State.Running}}' "$c" 2>/dev/null)
+
+    # Un contenedor que no existe no es lo mismo que uno caído: suele ser un
+    # nombre viejo en la conf, o un proyecto que todavía no se levantó acá.
+    # Reportarlo como [FALLA] manda a buscar un incidente que no pasó.
+    if [ -z "$state" ]; then
+        info "docker/$c: no existe en este host"
+        return
+    fi
+
+    if [ "$state" != "true" ]; then
+        bad "docker/$c: NO está corriendo — últimas líneas antes de morir:"
+        docker logs --tail 5 "$c" 2>&1 | cut -c1-140 | sed 's/^/             /'
+        return
+    fi
+
+    if ! logs=$(docker logs --since "$SINCE" "$c" 2>&1); then
+        hmm "docker/$c: no se pudieron leer los logs"
+        return
+    fi
+
+    raw=$(printf '%s\n' "$logs" | grep -E "$PATTERN_SYS" | grep -Ev "$NOISE") || true
+    [ -z "$raw" ] && return
+
+    n=$(printf '%s\n' "$raw" | wc -l)
+    bad "docker/$c: $n línea(s) en stdout"
+    render "$raw"
+}
+
+MINS=$(since_minutes)
+have_docker=0
+docker info >/dev/null 2>&1 && have_docker=1
 
 echo "############ ERRORES — últimas $SINCE"
 
@@ -152,28 +250,31 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
         # shellcheck source=/dev/null
         source "$conf"
 
+        ROOT="${ROOT:-/var/www/${PROJECT}}"
+        LOGS="${LOGS_DIR:-${ROOT}/logs}"
+
         echo
         echo "==> $name"
 
-        if [ -n "${CONTAINERS:-}" ]; then
-            list=("${CONTAINERS[@]}")
-        elif [ -n "${SERVICES:-}" ]; then
-            list=(); for s in "${SERVICES[@]}"; do list+=("${PROJECT}-${s}"); done
-        else
-            echo "           (la config no declara SERVICES ni CONTAINERS)"
-            exit 0
-        fi
+        # ---- capa de aplicación: la que más contexto tiene
+        report_file_layer "app.log  " "${LOGS}/app.log"   "$PATTERN_APP" "$MINS"
 
-        for c in "${list[@]}"; do
-            if [ "$(docker inspect -f '{{.State.Running}}' "$c" 2>/dev/null)" != "true" ]; then
-                # Un contenedor caído no tiene errores "recientes" que valgan:
-                # lo último que dijo antes de morir es lo que importa.
-                echo "  [ ojo ]  $c NO está corriendo — últimas líneas:"
-                docker logs --tail 5 "$c" 2>&1 | cut -c1-140 | sed 's/^/             /'
-                continue
+        # ---- capa de infraestructura: fatales y lo previo a la app
+        report_file_layer "error.log" "${LOGS}/error.log" "$PATTERN_SYS" "$MINS"
+
+        # ---- respaldo: lo que murió antes de escribir a archivo
+        if [ "$have_docker" -eq 1 ]; then
+            if [ -n "${CONTAINERS:-}" ]; then
+                list=("${CONTAINERS[@]}")
+            elif [ -n "${SERVICES:-}" ]; then
+                list=(); for s in "${SERVICES[@]}"; do list+=("${PROJECT}-${s}"); done
+            else
+                list=()
             fi
-            report_container "$c"
-        done
+            for c in "${list[@]}"; do
+                report_docker_layer "$c"
+            done
+        fi
     )
 done
 
@@ -181,4 +282,4 @@ echo
 echo "############ FIN"
 echo
 echo "  Traceback completo de un error puntual:"
-echo "    docker logs --since $SINCE <contenedor> | grep -A 20 '<fragmento>'"
+echo "    grep -A 20 '<fragmento>' /var/www/<proyecto>/logs/app.log"
