@@ -93,6 +93,22 @@ else
     docker ps -a --format '{{.Names}}\t{{.State}}\t{{.Status}}' 2>/dev/null \
         | sort | awk -F'\t' '{printf "           %-32s %-10s %s\n", $1, $2, $3}'
 
+    # Un contenedor detenido hace semanas no es de ningún compose de este repo:
+    # suele ser una prueba manual que quedó (el hello-world de la instalación,
+    # un docker run suelto). Ocupa poco, pero ensucia el listado y esconde a los
+    # que sí importan.
+    stale=$(docker ps -a --filter status=exited \
+                --format '{{.Names}}\t{{.Status}}' 2>/dev/null \
+            | grep -E 'Exited .* (weeks|months) ago' || true)
+    if [ -n "$stale" ]; then
+        echo
+        printf '%s\n' "$stale" | while IFS=$'\t' read -r cname cstatus; do
+            hmm "$cname lleva detenido mucho tiempo ($cstatus)"
+        done
+        info "si no hace falta: docker rm <nombre>"
+        info "no usar 'container prune': se lleva también los proyectos caídos"
+    fi
+
     # Un contenedor que reinicia en loop suele ser config rota, no falta de
     # recursos: el conteo alto es la pista.
     section "Reinicios"
