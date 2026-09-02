@@ -273,12 +273,40 @@ done
 title "SYSTEMD"
 
 section "Units de docker"
+# Casi todas son Type=oneshot: levantan el compose y terminan. Con
+# RemainAfterExit=yes quedan "active exited" (normal, el stack está arriba); las
+# que dispara un timer quedan "inactive dead" entre corridas (también normal).
+# Lo que sí es problema es "failed".
 systemctl list-units --type=service --all --no-legend 'docker-*' 2>/dev/null \
     | awk '{printf "           %-40s %s %s\n", $1, $3, $4}' || echo "           (sin acceso a systemctl)"
+info ""
+info "oneshot: 'active exited' = levantada; 'inactive dead' = espera su timer."
+info "Preocupa 'failed'."
 
 section "Timers"
-systemctl list-timers --no-legend 'docker-*' 2>/dev/null \
-    | awk '{printf "           %s\n", $0}' | cut -c1-110 || echo "           (sin timers)"
+# Un servicio disparado por timer se ve igual estando el timer activo o no: hay
+# que mirar el timer, no el .service.
+timers=$(systemctl list-timers --all --no-legend 'docker-*' 2>/dev/null)
+if [ -n "$timers" ]; then
+    printf '%s\n' "$timers" | cut -c1-110 | sed 's/^/           /'
+else
+    hmm "no hay timers docker-* instalados"
+fi
+
+for unit in docker-ember-cron.timer; do
+    if ! systemctl list-unit-files "$unit" >/dev/null 2>&1 \
+       || ! systemctl list-unit-files --no-legend "$unit" 2>/dev/null | grep -q .; then
+        bad "$unit NO está instalado"
+        info "sin él la cola de emails no se procesa sola"
+        info "sudo cp ${DOCKER}/systemd/${unit%.timer}.{service,timer} /etc/systemd/system/"
+        info "sudo systemctl daemon-reload && sudo systemctl enable --now $unit"
+    elif systemctl is-active --quiet "$unit"; then
+        ok "$unit activo"
+    else
+        bad "$unit instalado pero NO activo"
+        info "sudo systemctl enable --now $unit"
+    fi
+done
 
 echo
 echo "############ FIN"
