@@ -182,7 +182,24 @@ para poder bajarlos — sin esto falla con `404` al intentar descargar el zip.
 
 ## Levantar el proyecto
 
-### 1. Redes (si no existen)
+### Camino corto
+
+`auth` y `www` son aplicaciones independientes aunque compartan `compose/web.yml`, así que hay un script por dominio y cada uno levanta **sólo su servicio** (`docker compose up -d auth` / `... www`), sin tocar el otro:
+
+```bash
+/var/www/docker/bin/setup-linkedcode-auth.sh    # auth.linkedcode.com
+/var/www/docker/bin/setup-linkedcode-www.sh     # www.linkedcode.com
+```
+
+Ambos aceptan `--build` para reconstruir la imagen.
+
+Corren en dos fases. Primero chequean, sin tocar nada — el de `auth` verifica env, Docker, MySQL, base de datos, repo clonado, `config/config.php` y el keypair OAuth; el de `www`, que es estático, sólo el gateway y el contenido. Si algo falla, cortan sin haber modificado nada.
+
+Ninguno genera el keypair, `config.php` ni la base de datos: los verifica y te dice qué falta. Para el chequeo profundo con el stack ya arriba (mod_remoteip, cookies, caché de config, permisos de las claves) está `bin/check-linkedcode-auth.sh`.
+
+### Camino largo
+
+#### 1. Redes (si no existen)
 
 ```bash
 docker network create shared_services

@@ -43,7 +43,20 @@ Editar `env/web.env` con las credenciales reales (`DB_USER`/`DB_PASS`, `COMPOSER
 
 ## Levantar el proyecto
 
-### 1. Redes (si no existen)
+### Camino corto
+
+```bash
+/var/www/docker/bin/setup-liberamerkato.sh           # converge el stack
+/var/www/docker/bin/setup-liberamerkato.sh --build   # además reconstruye las imágenes
+```
+
+Corre en dos fases. Primero chequea, sin tocar nada: env completo, Docker accesible, `shared-mysql` y `shared-gateway` arriba, base accesible con las credenciales del env, y API clonada. Si algo falla, corta ahí sin haber modificado nada y te muestra **todos** los problemas juntos. Recién después crea directorios, redes y levanta los contenedores.
+
+No crea la base de datos ni el DNS. Para eso, y para entender cada paso, seguir el camino largo.
+
+### Camino largo
+
+#### 1. Redes (si no existen)
 
 ```bash
 docker network create shared_services

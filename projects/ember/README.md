@@ -12,6 +12,19 @@ se hacen con `bin/ember.php` dentro del contenedor (ver `README.md` del propio p
 
 ---
 
+## Camino corto
+
+```bash
+/var/www/docker/bin/setup-ember.sh           # converge el stack
+/var/www/docker/bin/setup-ember.sh --build   # además reconstruye la imagen
+```
+
+Corre en dos fases. Primero chequea, sin tocar nada: env completo (incluido el largo de `SMTP_PASS_KEY`), Docker accesible, `shared-mysql` arriba, base accesible con las credenciales del env, y el repo clonado. Si algo falla, corta ahí sin haber modificado nada. Recién después crea la red y levanta el contenedor, y al final avisa si el timer del cron no está instalado o activo.
+
+No clona el repo, no crea la base ni instala las units de systemd: las verifica y te dice qué falta. Para eso, seguir la instalación completa.
+
+---
+
 ## Primera instalación en el VPS
 
 ### 1. Clonar el proyecto Ember
