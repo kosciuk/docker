@@ -110,6 +110,31 @@ salida se puede pegar en un chat o un issue sin filtrar credenciales.
 Es el complemento de los `setup-*.sh`: aquéllos verifican lo necesario para
 levantar un proyecto, éste responde "qué está pasando" cuando algo ya está roto.
 
+## Limpieza de disco
+
+`cleanup.sh` libera lo que Docker y systemd acumulan solos. En un VPS con varios
+proyectos lo que más crece, y por lejos, es el **build cache de Docker**: cada
+build deja capas intermedias que nadie borra.
+
+```bash
+./bin/cleanup.sh              # simulación: dice qué liberaría, sin tocar nada
+./bin/cleanup.sh --apply      # ejecuta
+```
+
+Limpia build cache, journal de systemd (lo deja en 200 MB), capas dangling y
+volúmenes sin links. Además avisa —sin borrarlas— de las imágenes que ya no usa
+ningún contenedor, y de si falta configurar la rotación de logs de Docker.
+
+**Nunca toca volúmenes en uso.** En particular `mysql_mysql_data` y los del
+mailserver, donde viven las bases y los mails. Por eso el script no usa
+`docker system prune --volumes`, que sí se los llevaría puestos. Tampoco toca
+`/var/www` ni reinicia contenedores: se puede correr con los sitios andando.
+
+Para que el disco no se vuelva a llenar solo, conviene además dejar puestas dos
+cosas que el script detecta pero no aplica (las dos son globales del host):
+`SystemMaxUse=200M` en `/etc/systemd/journald.conf`, y la rotación de logs de
+contenedor en `/etc/docker/daemon.json`.
+
 ## Otros scripts
 
 | Script | Qué hace |
