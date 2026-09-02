@@ -252,16 +252,24 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
         # ---- dns y certificado
         if [ -n "${DOMAIN:-}" ] && command -v dig >/dev/null 2>&1; then
             section "DNS"
-            myip=$(curl -s --max-time 5 https://ifconfig.me 2>/dev/null)
+            # -4 y -6 explícitos: sin eso curl elige la familia que prefiera el
+            # sistema, y comparar un registro A contra una IPv6 marca como
+            # sospechoso un DNS que está bien.
+            my4=$(curl -s4 --max-time 5 https://ifconfig.me 2>/dev/null)
+            my6=$(curl -s6 --max-time 5 https://ifconfig.me 2>/dev/null)
             for sub in "" www. api. app. img.; do
                 host="${sub}${DOMAIN}"
                 ip=$(dig +short "$host" A 2>/dev/null | tail -1)
-                if [ -z "$ip" ]; then
+                ip6=$(dig +short "$host" AAAA 2>/dev/null | tail -1)
+                if [ -z "$ip" ] && [ -z "$ip6" ]; then
                     hmm "$host no resuelve"
-                elif [ -n "$myip" ] && [ "$ip" = "$myip" ]; then
-                    ok "$host → $ip"
+                elif { [ -n "$ip" ] && [ "$ip" = "$my4" ]; } \
+                  || { [ -n "$ip6" ] && [ "$ip6" = "$my6" ]; }; then
+                    ok "$host → ${ip:-$ip6}"
+                elif [ -z "$my4" ] && [ -z "$my6" ]; then
+                    info "$host → ${ip:-$ip6} (no se pudo averiguar la IP del VPS)"
                 else
-                    hmm "$host → $ip (este VPS: ${myip:-?})"
+                    hmm "$host → ${ip:-$ip6} (este VPS: ${my4:-sin IPv4}${my6:+ / $my6})"
                 fi
             done
         fi
