@@ -89,6 +89,27 @@ Para chequeos que no entran en ese molde, la config puede definir dos funciones:
 `ember.conf` valida el largo de `SMTP_PASS_KEY`, y `partidodelasoledad.conf`
 detecta un `config.php` que quedó apuntando a `localhost`.
 
+## Diagnóstico
+
+`diagnose.sh` junta en una sola corrida el estado de todo el VPS: host (disco,
+memoria), Docker (contenedores, reinicios, redes), y por proyecto el env, el
+código desplegado, los directorios, la base de datos y el DNS.
+
+```bash
+./bin/diagnose.sh              # todos los proyectos
+./bin/diagnose.sh enforos      # sólo uno
+```
+
+**Sólo lee.** No crea, no modifica, no levanta ni reinicia nada: se puede correr
+en producción con el sitio andando.
+
+**Los secretos no se imprimen nunca.** De cada uno reporta si está definido y
+cuántos caracteres tiene, y marca los que quedaron con un placeholder. Así la
+salida se puede pegar en un chat o un issue sin filtrar credenciales.
+
+Es el complemento de los `setup-*.sh`: aquéllos verifican lo necesario para
+levantar un proyecto, éste responde "qué está pasando" cuando algo ya está roto.
+
 ## Otros scripts
 
 | Script | Qué hace |
