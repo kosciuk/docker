@@ -21,6 +21,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      APP_URL: ${APP_URL:-https://api.partidodelasoledad.com.ar}
       COMPOSER_AUTH: ${COMPOSER_AUTH}
       JWT_SECRET: ${JWT_SECRET}
       JWT_ISSUER: ${JWT_ISSUER:-https://api.partidodelasoledad.com.ar}

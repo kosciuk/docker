@@ -15,6 +15,10 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-https://api.perdidosyencontrados.com.ar}
+      APP_URL: ${APP_URL:-https://api.perdidosyencontrados.com.ar}
+      IMG_URL: ${IMG_URL:-https://img.perdidosyencontrados.com.ar}
       COMPOSER_AUTH: ${COMPOSER_AUTH}
     volumes:
       - /var/www/perdidosyencontrados/api:/var/www/html
