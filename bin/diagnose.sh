@@ -19,6 +19,56 @@ set -uo pipefail
 DOCKER="${DOCKER:-/var/www/docker}"
 ONLY="${1:-}"
 
+# Los nombres salen de bin/projects/*.conf, y no siempre coinciden con el
+# directorio ni con el contenedor: linkedcode se diagnostica como
+# linkedcode-auth y linkedcode-www por separado, porque comparten compose pero
+# son aplicaciones independientes.
+list_projects() {
+    local c
+    for c in "$DOCKER"/bin/projects/*.conf; do
+        [ -e "$c" ] || continue
+        basename "$c" .conf
+    done
+}
+
+usage() {
+    cat <<EOF
+Radiografía del VPS: estado del host, de Docker y de cada proyecto.
+
+  $(basename "$0")              todos los proyectos
+  $(basename "$0") <proyecto>   sólo uno
+  $(basename "$0") --help       esta ayuda
+
+Proyectos disponibles:
+EOF
+    local n
+    for n in $(list_projects); do
+        printf '  %-24s %s\n' "$n" "$(sed -n '1s/^# *//p' "$DOCKER/bin/projects/$n.conf")"
+    done
+    cat <<EOF
+
+Sólo lee: no crea, no modifica y no reinicia nada. Se puede correr en
+producción con el sitio andando. Los secretos se reportan por largo, nunca
+por valor.
+EOF
+}
+
+case "$ONLY" in
+    -h|--help|help) usage; exit 0 ;;
+esac
+
+# Un nombre mal escrito no debe pasar en silencio: sin esto el filtro no
+# matchea nada y el script corre entero sin diagnosticar ningún proyecto.
+if [ -n "$ONLY" ] && [ ! -f "$DOCKER/bin/projects/$ONLY.conf" ]; then
+    echo "No existe el proyecto '$ONLY'."
+    echo
+    echo "Disponibles:"
+    list_projects | sed 's/^/  /'
+    echo
+    echo "Ver '$(basename "$0") --help' para más detalle."
+    exit 2
+fi
+
 ok()   { echo "  [ ok ]   $1"; }
 bad()  { echo "  [FALLA]  $1"; }
 hmm()  { echo "  [ ojo ]  $1"; }

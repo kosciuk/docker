@@ -98,7 +98,14 @@ código desplegado, los directorios, la base de datos y el DNS.
 ```bash
 ./bin/diagnose.sh              # todos los proyectos
 ./bin/diagnose.sh enforos      # sólo uno
+./bin/diagnose.sh --help       # qué proyectos hay
 ```
+
+Los nombres salen de `bin/projects/*.conf` y no siempre coinciden con el
+directorio: `auth.linkedcode.com` se diagnostica como **`linkedcode-auth`**, y
+`www.linkedcode.com` como **`linkedcode-www`** — comparten compose pero son
+aplicaciones independientes. Un nombre que no existe corta con la lista de los
+válidos.
 
 **Sólo lee.** No crea, no modifica, no levanta ni reinicia nada: se puede correr
 en producción con el sitio andando.
