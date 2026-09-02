@@ -37,7 +37,7 @@ services:
     container_name: cooperativismoabierto-app
     restart: unless-stopped
     volumes:
-      - /var/www/cooperativismoabierto/app/dist:/usr/local/apache2/htdocs
+      - /var/www/cooperativismoabierto/app:/usr/local/apache2/htdocs
     networks:
       - projects_public
 

@@ -37,7 +37,7 @@ services:
     container_name: partidodelasoledad-app
     restart: unless-stopped
     volumes:
-      - /var/www/partidodelasoledad/app/dist:/usr/local/apache2/htdocs
+      - /var/www/partidodelasoledad/app:/usr/local/apache2/htdocs
     networks:
       - projects_public
 
