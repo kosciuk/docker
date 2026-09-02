@@ -20,7 +20,9 @@ services:
       - /var/www/enforos/api:/var/www/html
       - enforos_api_cache:/var/www/html/var/cache
       - enforos_api_vendor:/var/www/html/vendor
+      - /var/www/enforos/img:/var/www/enforos/img
       - /var/www/enforos/logs:/var/www/enforos/logs
+      - /var/www/docker/projects/enforos/config/uploads.ini:/usr/local/etc/php/conf.d/zz-uploads.ini:ro
     networks:
       - shared_services
       - projects_public
@@ -36,6 +38,17 @@ services:
     networks:
       - projects_public
 
+  img:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: enforos-img
+    restart: unless-stopped
+    volumes:
+      - /var/www/enforos/img:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
   www:
     build:
       context: /var/www/docker
@@ -43,10 +56,7 @@ services:
     container_name: enforos-www
     restart: unless-stopped
     volumes:
-      - /var/www/docker/projects/enforos/config/www-redirect.conf:/usr/local/apache2/conf/extra/redirect.conf:ro
-    command: >
-      sh -c "echo 'Include conf/extra/redirect.conf' >> /usr/local/apache2/conf/httpd.conf
-      && httpd-foreground"
+      - /var/www/enforos/www:/usr/local/apache2/htdocs
     networks:
       - projects_public
 

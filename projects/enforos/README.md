@@ -1,20 +1,23 @@
 # Enforos
 
-Sitio con 3 subdominios:
+Sitio con 4 subdominios:
 
 | Subdominio | Servicio | Contenido | Deploy |
 |---|---|---|---|
 | `api.enforos.net` | `api` (php84-fpm) | API Slim (código + Composer vendor) | `git pull` / CI en el VPS |
 | `app.enforos.net` | `app` (apache-static) | `dist/` de la SPA Vue | `rsync` |
-| `www.enforos.net` | `www` (apache-static) | por ahora, solo redirige a `app.enforos.net` | ya configurado, no requiere deploy |
+| `img.enforos.net` | `img` (apache-static) | uploads (imágenes) | escrito por la API |
+| `www.enforos.net` | `www` (apache-static) | versión estática SEO | `rsync` |
 
 Archivos en el VPS:
 
 - API: `/var/www/enforos/api`
 - App (dist): `/var/www/enforos/app`
+- Uploads: `/var/www/enforos/img`
+- Sitio estático SEO: `/var/www/enforos/www`
 - Logs: `/var/www/enforos/logs`
 
-El servicio `www` no sirve archivos: es un Apache que solo aplica un `RewriteRule` a `app.enforos.net`, definido en `config/www-redirect.conf`. El día que haya un sitio estático propio, se le agrega el volumen con los archivos igual que en `app`.
+El contenedor `api` también monta `/var/www/enforos/img` (mismo path) para poder escribir los uploads que sirve el contenedor `img`. Los límites de `post_max_size` / `upload_max_filesize` están en `config/uploads.ini`.
 
 Los VirtualHosts ya están definidos en `gateway/sites/enforos.conf` — no hay que configurar nada más ahí.
 
@@ -23,8 +26,8 @@ Los VirtualHosts ya están definidos en `gateway/sites/enforos.conf` — no hay 
 ## Primera vez en el VPS
 
 ```bash
-sudo mkdir -p /var/www/enforos/{app,logs}
-sudo chown ubuntu:ubuntu /var/www/enforos/app /var/www/enforos/logs
+sudo mkdir -p /var/www/enforos/{app,img,www,logs}
+sudo chown ubuntu:ubuntu /var/www/enforos/{app,img,www,logs}
 
 # api se clona con git, no se crea vacío
 git clone git@github-linkedcode:enforos/api.git /var/www/enforos/api
@@ -41,7 +44,24 @@ Editar `env/web.env` con las credenciales reales (`DB_USER`/`DB_PASS`, `COMPOSER
 
 ## Levantar el proyecto
 
-### 1. Redes (si no existen)
+### Camino corto
+
+```bash
+/var/www/docker/bin/setup-enforos.sh           # converge el stack
+/var/www/docker/bin/setup-enforos.sh --build   # además reconstruye las imágenes
+```
+
+Crea los directorios, verifica redes / MySQL / gateway y levanta el stack. Se puede correr de nuevo sin romper nada, así que también sirve para aplicar un subdominio nuevo sobre un stack ya andando.
+
+Corre en dos fases. Primero chequea, sin tocar nada: env completo, Docker accesible, `shared-mysql` y `shared-gateway` arriba, base de datos accesible con las credenciales del env, y API clonada. Si algo de eso falla, corta ahí y no modificó nada — te muestra **todos** los problemas juntos, no el primero. Recién superada esa fase crea directorios, redes y levanta los contenedores.
+
+Converge, pero no es idempotente en sentido estricto: si cambió el `compose.yml` los contenedores afectados se recrean (corte breve de la API), y `--build` no reproduce la imagen anterior porque los Dockerfile usan tags móviles y `apt`/`pecl`/`composer` sin versión fija. Por eso el rebuild es opt-in.
+
+No crea la base de datos ni el DNS — para eso, y para entender qué hace cada paso, seguir el camino largo.
+
+### Camino largo
+
+#### 1. Redes (si no existen)
 
 ```bash
 docker network create shared_services
@@ -86,7 +106,7 @@ docker compose --env-file /var/www/docker/projects/enforos/env/web.env \
 ## Hosts locales (en tu máquina)
 
 ```text
-IP_DEL_VPS enforos.net www.enforos.net api.enforos.net app.enforos.net
+IP_DEL_VPS enforos.net www.enforos.net api.enforos.net app.enforos.net img.enforos.net
 ```
 
 ---
@@ -103,9 +123,9 @@ sudo systemctl enable --now docker-enforos.service
 
 ## Producción
 
-Apache (`mod_md`) obtiene el certificado Let's Encrypt automáticamente para los 4 nombres declarados en `MDomain` si:
+Apache (`mod_md`) obtiene el certificado Let's Encrypt automáticamente para los 5 nombres declarados en `MDomain` si:
 
-- los registros DNS de `enforos.net`, `www`, `api` y `app` apuntan al VPS
+- los registros DNS de `enforos.net`, `www`, `api`, `app` e `img` apuntan al VPS
 - los puertos `80` y `443` están abiertos
 - el gateway está corriendo
 
@@ -144,4 +164,12 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.html [L]
 ```
 
-No hace falta reiniciar el contenedor — es un bind mount.
+### www (versión estática SEO)
+
+```bash
+rsync -avz --delete /ruta/local/al/sitio/ usuario@IP_DEL_VPS:/var/www/enforos/www/
+```
+
+Hasta que haya contenido propio, `www.enforos.net` sirve lo que haya en ese directorio: si está vacío, devuelve un índice vacío en vez de redirigir a la app como hacía antes.
+
+No hace falta reiniciar los contenedores — son bind mounts.
