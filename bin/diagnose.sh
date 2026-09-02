@@ -286,9 +286,20 @@ info "Preocupa 'failed'."
 section "Timers"
 # Un servicio disparado por timer se ve igual estando el timer activo o no: hay
 # que mirar el timer, no el .service.
+# La salida de list-timers es ancha y el nombre del timer queda al final, así
+# que se reordena en vez de truncar la línea a lo bruto.
 timers=$(systemctl list-timers --all --no-legend 'docker-*' 2>/dev/null)
 if [ -n "$timers" ]; then
-    printf '%s\n' "$timers" | cut -c1-110 | sed 's/^/           /'
+    printf '%s\n' "$timers" | awk '
+        {
+          # Reiniciar por línea: si no, un timer que nunca corrió hereda el
+          # "hace X" del anterior y parece que sí corrió.
+          t = ""; passed = "nunca"
+          for (i = 1; i <= NF; i++) if ($i ~ /\.timer$/) { t = $i; break }
+          left = $5                                    # LEFT, antes de la fecha de LAST
+          for (i = 1; i <= NF; i++) if ($i == "ago") passed = $(i-1)
+          printf "           %-34s próxima en %-8s última hace %s\n", t, left, passed
+        }'
 else
     hmm "no hay timers docker-* instalados"
 fi
