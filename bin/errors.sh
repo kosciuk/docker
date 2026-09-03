@@ -6,6 +6,7 @@
 #   ./bin/errors.sh enforos            # sólo uno
 #   ./bin/errors.sh enforos 2h         # otra ventana
 #   ./bin/errors.sh --all              # sin agrupar: cada ocurrencia
+#   ./bin/errors.sh -q                 # sólo proyectos con algo para mostrar
 #
 # A diferencia de diagnose.sh, que sólo dice "hay N líneas con error", esto
 # muestra CUÁLES. El objetivo es que entre en pantalla: de cada error se
@@ -40,11 +41,13 @@ source "${DOCKER}/bin/lib/redact.sh"
 ONLY=""
 SINCE="24h"
 GROUP=1
+QUIET=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help|help) SHOW_HELP=1; shift ;;
         -a|--all)       GROUP=0; shift ;;
+        -q|--quiet)     QUIET=1; shift ;;
         # Una ventana es un número seguido de unidad; cualquier otra cosa es el
         # nombre del proyecto. Así el orden de los argumentos no importa.
         [0-9]*[smhd])   SINCE="$1"; shift ;;
@@ -69,6 +72,7 @@ Errores recientes de cada proyecto, agrupados y sin stack trace.
   $(basename "$0") <proyecto>       sólo uno
   $(basename "$0") <proyecto> 2h    otra ventana (30m, 2h, 7d...)
   $(basename "$0") --all            sin agrupar: cada ocurrencia
+  $(basename "$0") -q               sólo proyectos con algo para mostrar
   $(basename "$0") --help           esta ayuda
 
 Se leen las tres capas de log de cada proyecto:
@@ -104,10 +108,10 @@ if [ -n "$ONLY" ] && [ ! -f "$DOCKER/bin/projects/$ONLY.conf" ]; then
     exit 2
 fi
 
-ok()   { echo "  [ ok ]   $1"; }
+ok()   { [ "$QUIET" -eq 1 ] && return; echo "  [ ok ]   $1"; }
 bad()  { echo "  [FALLA]  $1"; }
 hmm()  { echo "  [ ojo ]  $1"; }
-info() { echo "           $1"; }
+info() { [ "$QUIET" -eq 1 ] && return; echo "           $1"; }
 
 # Convierte la ventana (30m, 2h, 7d) a minutos, para `find -mmin`.
 since_minutes() {
@@ -256,16 +260,13 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
     name=$(basename "$conf" .conf)
     [ -n "$ONLY" ] && [ "$ONLY" != "$name" ] && continue
 
-    (
+    body=$(
         set +u
         # shellcheck source=/dev/null
         source "$conf"
 
         ROOT="${ROOT:-/var/www/${PROJECT}}"
         LOGS="${LOGS_DIR:-${ROOT}/logs}"
-
-        echo
-        echo "==> $name"
 
         # ---- capa de aplicación: la que más contexto tiene
         report_file_layer "app.log  " "${LOGS}/app.log"   "$PATTERN_APP" "$MINS"
@@ -287,6 +288,17 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
             done
         fi
     )
+
+    # En modo quiet, ok()/info() ya no imprimieron nada dentro del subshell:
+    # un $body vacío significa que este proyecto no tuvo nada para mostrar, y
+    # ni el título vale la pena verlo.
+    if [ "$QUIET" -eq 1 ] && [ -z "$body" ]; then
+        continue
+    fi
+
+    echo
+    echo "==> $name"
+    [ -n "$body" ] && printf '%s\n' "$body"
 done
 
 echo

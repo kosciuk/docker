@@ -5,6 +5,8 @@
 #
 #   ./bin/diagnose.sh              # todos los proyectos
 #   ./bin/diagnose.sh enforos      # sólo uno
+#   ./bin/diagnose.sh -q           # sólo lo que no es [ ok ]
+#   ./bin/diagnose.sh -q enforos   # combinables, en cualquier orden
 #
 # SÓLO LEE. No crea, no modifica, no levanta ni reinicia nada: se puede correr
 # en producción con el sitio andando.
@@ -20,7 +22,15 @@ DOCKER="${DOCKER:-/var/www/docker}"
 
 # shellcheck source=/dev/null
 source "${DOCKER}/bin/lib/redact.sh"
-ONLY="${1:-}"
+
+QUIET=0
+ONLY=""
+for arg in "$@"; do
+    case "$arg" in
+        -q|--quiet) QUIET=1 ;;
+        *)          ONLY="$arg" ;;
+    esac
+done
 
 # Los nombres salen de bin/projects/*.conf, y no siempre coinciden con el
 # directorio ni con el contenedor: linkedcode se diagnostica como
@@ -72,7 +82,7 @@ if [ -n "$ONLY" ] && [ ! -f "$DOCKER/bin/projects/$ONLY.conf" ]; then
     exit 2
 fi
 
-ok()   { echo "  [ ok ]   $1"; }
+ok()   { [ "$QUIET" -eq 1 ] && return; echo "  [ ok ]   $1"; }
 bad()  { echo "  [FALLA]  $1"; }
 hmm()  { echo "  [ ojo ]  $1"; }
 info() { echo "           $1"; }
@@ -143,8 +153,13 @@ else
     done
 
     section "Todos los contenedores"
-    docker ps -a --format '{{.Names}}\t{{.State}}\t{{.Status}}' 2>/dev/null \
-        | sort | awk -F'\t' '{printf "           %-32s %-10s %s\n", $1, $2, $3}'
+    if [ "$QUIET" -eq 1 ]; then
+        docker ps -a --format '{{.Names}}\t{{.State}}\t{{.Status}}' 2>/dev/null \
+            | sort | awk -F'\t' '$2 != "running" {printf "           %-32s %-10s %s\n", $1, $2, $3}'
+    else
+        docker ps -a --format '{{.Names}}\t{{.State}}\t{{.Status}}' 2>/dev/null \
+            | sort | awk -F'\t' '{printf "           %-32s %-10s %s\n", $1, $2, $3}'
+    fi
 
     # Un contenedor detenido hace semanas no es de ningún compose de este repo:
     # suele ser una prueba manual que quedó (el hello-world de la instalación,
@@ -354,11 +369,21 @@ section "Units de docker"
 # RemainAfterExit=yes quedan "active exited" (normal, el stack está arriba); las
 # que dispara un timer quedan "inactive dead" entre corridas (también normal).
 # Lo que sí es problema es "failed".
-systemctl list-units --type=service --all --no-legend 'docker-*' 2>/dev/null \
-    | awk '{printf "           %-40s %s %s\n", $1, $3, $4}' || echo "           (sin acceso a systemctl)"
-info ""
-info "oneshot: 'active exited' = levantada; 'inactive dead' = espera su timer."
-info "Preocupa 'failed'."
+if [ "$QUIET" -eq 1 ]; then
+    units=$(systemctl list-units --type=service --all --no-legend 'docker-*' 2>/dev/null \
+        | awk '$3 == "failed" {printf "           %-40s %s %s\n", $1, $3, $4}')
+    if [ -n "$units" ]; then
+        printf '%s\n' "$units"
+    else
+        ok "sin units 'failed'"
+    fi
+else
+    systemctl list-units --type=service --all --no-legend 'docker-*' 2>/dev/null \
+        | awk '{printf "           %-40s %s %s\n", $1, $3, $4}' || echo "           (sin acceso a systemctl)"
+    info ""
+    info "oneshot: 'active exited' = levantada; 'inactive dead' = espera su timer."
+    info "Preocupa 'failed'."
+fi
 
 section "Timers"
 # Un servicio disparado por timer se ve igual estando el timer activo o no: hay
