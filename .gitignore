@@ -1,3 +1,7 @@
-CLAUDE.md
+# CLAUDE.md se ignora globalmente (~/.gitignore_global), pero acá sí se versiona:
+# es documentación de la infraestructura y tiene que llegar al VPS, que es donde
+# hacen falta sus reglas de qué se puede correr y qué no.
+!CLAUDE.md
+
 *.env
 !*.env.example
