@@ -17,6 +17,9 @@
 set -uo pipefail
 
 DOCKER="${DOCKER:-/var/www/docker}"
+
+# shellcheck source=/dev/null
+source "${DOCKER}/bin/lib/redact.sh"
 ONLY="${1:-}"
 
 # Los nombres salen de bin/projects/*.conf, y no siempre coinciden con el
@@ -292,7 +295,7 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
                     [ "${errs:-0}" -gt 0 ] && hmm "  $errs línea(s) con error/exception en 24h"
                 else
                     bad "$c NO está corriendo"
-                    docker logs --tail 3 "$c" 2>&1 | sed 's/^/             /' | cut -c1-100
+                    docker logs --tail 3 "$c" 2>&1 | redact | sed 's/^/             /' | cut -c1-100
                 fi
             done
         fi

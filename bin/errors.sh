@@ -24,11 +24,18 @@
 #   docker logs stdout del contenedor. Sólo como respaldo: lo que muere tan
 #               temprano que no alcanza a escribir a ningún archivo.
 #
+# La salida pasa por redact(): IPs, mails, tokens, credenciales y user-agents
+# se tachan antes de imprimir, así se puede pegar en un chat o un ticket. El
+# archivo en disco queda intacto.
+#
 # SÓLO LEE. Se puede correr en producción con el sitio andando.
 #
 set -uo pipefail
 
 DOCKER="${DOCKER:-/var/www/docker}"
+
+# shellcheck source=/dev/null
+source "${DOCKER}/bin/lib/redact.sh"
 
 ONLY=""
 SINCE="24h"
@@ -77,7 +84,10 @@ EOF
     done
     cat <<EOF
 
-Para el traceback completo de un error puntual:
+La salida va tachada (IPs, mails, tokens, credenciales): se puede compartir.
+
+Para el traceback completo de un error puntual — SIN tachar, sale tal cual
+está en disco, así que no pegarlo afuera sin leerlo antes:
   grep -A 20 '<fragmento del mensaje>' /var/www/<proyecto>/logs/app.log
 EOF
 }
@@ -142,11 +152,12 @@ render() {
     local raw="$1"
 
     if [ "$GROUP" -eq 0 ]; then
-        printf '%s\n' "$raw" | cut -c1-160 | sed 's/^/             /'
+        printf '%s\n' "$raw" | redact | cut -c1-160 | sed 's/^/             /'
         return
     fi
 
     printf '%s\n' "$raw" \
+        | redact \
         | normalize \
         | sort | uniq -c | sort -rn \
         | head -10 \
@@ -155,7 +166,7 @@ render() {
           done
 
     local distintos
-    distintos=$(printf '%s\n' "$raw" | normalize | sort -u | wc -l)
+    distintos=$(printf '%s\n' "$raw" | redact | normalize | sort -u | wc -l)
     [ "$distintos" -gt 10 ] && echo "             ... y $((distintos - 10)) mensaje(s) distinto(s) más"
 }
 
@@ -218,7 +229,7 @@ report_docker_layer() {
 
     if [ "$state" != "true" ]; then
         bad "docker/$c: NO está corriendo — últimas líneas antes de morir:"
-        docker logs --tail 5 "$c" 2>&1 | cut -c1-140 | sed 's/^/             /'
+        docker logs --tail 5 "$c" 2>&1 | redact | cut -c1-140 | sed 's/^/             /'
         return
     fi
 
@@ -281,5 +292,7 @@ done
 echo
 echo "############ FIN"
 echo
-echo "  Traceback completo de un error puntual:"
+echo "  Lo de arriba va tachado (IPs, mails, tokens): se puede compartir."
+echo
+echo "  Traceback completo de un error puntual — SIN tachar:"
 echo "    grep -A 20 '<fragmento>' /var/www/<proyecto>/logs/app.log"
