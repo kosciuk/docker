@@ -1,0 +1,32 @@
+# MySQL efímero para las suites de tests que corren en el host.
+#
+# Deliberadamente separado de services/mysql (el de desarrollo):
+#   - las suites crean y borran bases enteras; hacerlo contra la instancia
+#     que tiene los datos de desarrollo es un accidente caro,
+#   - el datadir va en tmpfs y con el flush a disco desactivado, una
+#     configuración que sólo tiene sentido si los datos son descartables.
+#
+# Sin volumen: al parar el contenedor no queda nada. El schema lo rehacen
+# las migraciones en el arranque de la suite.
+services:
+  mysql-test:
+    image: mysql:8.4
+    container_name: test-mysql
+    ports:
+      - "127.0.0.1:3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+      MYSQL_DATABASE: test
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-flush-log-at-trx-commit=0
+      - --innodb-doublewrite=0
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -ptest --silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
