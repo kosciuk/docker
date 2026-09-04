@@ -228,9 +228,16 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
         # ---- variables del env, sin exponer valores
         if [ -f "$ENV_FILE" ]; then
             section "Variables del env"
-            for var in APP_ENV DB_HOST DB_NAME DB_USER; do
+            # APP_ENV la necesita el contenedor: es lo que decide qué
+            # config.<env>.php carga notenv.
+            v=$(sed -n "s/^APP_ENV=//p" "$ENV_FILE" | tr -d '"'"'"'')
+            [ -n "$v" ] && ok "APP_ENV = $v" || bad "APP_ENV sin definir"
+
+            # Las DB_* son opcionales: con notenv migrado viven en
+            # config.<env>.php. Se muestran si están, sin reclamarlas.
+            for var in DB_HOST DB_NAME DB_USER; do
                 v=$(sed -n "s/^${var}=//p" "$ENV_FILE" | tr -d '"'"'"'')
-                [ -n "$v" ] && ok "$var = $v" || hmm "$var sin definir"
+                [ -n "$v" ] && ok "$var = $v"
             done
             for var in DB_PASS JWT_SECRET SMTP_PASS_KEY COMPOSER_AUTH; do
                 if grep -q "^${var}=" "$ENV_FILE" 2>/dev/null; then
@@ -258,15 +265,88 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
             done
         fi
 
-        # ---- config.php: ya es opcional, pero si existe puede estar pisando el env
-        app_config="${ROOT}/api/config/config.php"
-        if [ -f "$app_config" ]; then
-            section "config.php (opcional: pisa al env)"
-            hmm "existe: $app_config"
-            if grep -qE "'host'[[:space:]]*=>[[:space:]]*'(localhost|127\.0\.0\.1)'" "$app_config" 2>/dev/null; then
-                bad "  apunta a localhost -> dentro del contenedor no hay MySQL ahí"
+        # ---- config de notenv (config/config.<env>.php)
+        #
+        # notenv carga config/common.php (versionado, sin secretos) y encima
+        # config/config.<env>.php, con <env> normalizado a dev|test|prod. Si el
+        # del entorno activo no existe NO es un error para notenv: se queda con
+        # common.php y sigue. En un servidor eso es grave y silencioso -- la app
+        # arranca con los valores de desarrollo (CORS a .local, base a 127.0.0.1)
+        # y falla recién en el primer request que dependa de ellos.
+        conf_dir="${ROOT}/api/config"
+        if [ -d "$conf_dir" ]; then
+            section "Config de la app (notenv)"
+
+            [ -f "$conf_dir/common.php" ] \
+                && ok "common.php presente" \
+                || bad "falta $conf_dir/common.php (es obligatorio)"
+
+            # Misma normalización que hace notenv: production->prod,
+            # development->dev, testing->test. Sin APP_ENV, dev.
+            raw_env=$(sed -n 's/^APP_ENV=//p' "$ENV_FILE" 2>/dev/null | tr -d '"'"'"'' | tr '[:upper:]' '[:lower:]')
+            case "${raw_env:-dev}" in
+                prod|production)    app_env=prod ;;
+                test|testing)       app_env=test ;;
+                dev|development|'') app_env=dev ;;
+                *)                  app_env="" ;;
+            esac
+
+            if [ -z "$app_env" ]; then
+                bad "APP_ENV='${raw_env}' no es dev|test|prod -- notenv lanza excepción al arrancar"
+            else
+                env_config="$conf_dir/config.${app_env}.php"
+                if [ -f "$env_config" ]; then
+                    ok "config.${app_env}.php presente (APP_ENV=${raw_env:-sin definir})"
+                else
+                    bad "falta config.${app_env}.php (APP_ENV=${raw_env:-sin definir})"
+                    info "  notenv NO falla: se queda sólo con common.php, que trae los valores de dev"
+                    if [ -f "${env_config}.example" ]; then
+                        info "  hay un ejemplo al lado: cp ${env_config}.example ${env_config}"
+                    fi
+                fi
+
+                # El nombre viejo, de antes del breaking change de notenv. Si
+                # quedó dando vueltas confunde: parece la config activa y no se
+                # lee nunca.
+                if [ -f "$conf_dir/config.php" ]; then
+                    hmm "hay un config.php suelto -- notenv ya no lo lee (el nombre es config.<env>.php)"
+                fi
             fi
-            grep -qE "'secret'" "$app_config" 2>/dev/null && info "  define un 'secret' propio"
+
+            # notenv reemplaza a dotenv: los valores de la app viven en
+            # config.<env>.php, y el env del compose queda sólo para lo que
+            # necesita el contenedor en sí (APP_ENV, TZ, COMPOSER_AUTH). Una
+            # credencial en web.env es a la vez inútil -- nadie la lee -- y un
+            # secreto de más en un archivo que no le corresponde.
+            if [ -f "$ENV_FILE" ]; then
+                leftovers=$(grep -oE '^(DB_[A-Z_]+|JWT_[A-Z_]+|APP_URL|SMTP_[A-Z_]+|IMG_[A-Z_]+)=' "$ENV_FILE" 2>/dev/null \
+                            | tr -d '=' | sort -u | tr '\n' ' ')
+                if [ -n "$leftovers" ]; then
+                    hmm "web.env define variables de aplicación: ${leftovers}"
+                    info "  con notenv esos valores van en config.${app_env:-<env>}.php, no en el env del compose"
+                    info "  el env sólo lleva lo del contenedor: APP_ENV, TZ, COMPOSER_AUTH"
+                fi
+            fi
+
+            # Valores de dev que en un servidor son un problema. Se miran en el
+            # archivo del entorno si existe, y si no en common.php, que es lo
+            # que la app va a terminar usando.
+            [ "$app_env" = "prod" ] && for f in "${env_config:-}" "$conf_dir/common.php"; do
+                [ -f "$f" ] || continue
+                if grep -qE "'host'[[:space:]]*=>[[:space:]]*'(localhost|127\.0\.0\.1)'" "$f" 2>/dev/null; then
+                    bad "$(basename "$f"): la base apunta a localhost -- dentro del contenedor no hay MySQL ahí"
+                fi
+                grep -qE "\.local" "$f" 2>/dev/null \
+                    && hmm "$(basename "$f"): tiene dominios .local (CORS/redirects de desarrollo)"
+
+                # Los secretos se mudaron del env a este archivo, así que el
+                # placeholder sin completar también. No se imprime ningún valor:
+                # sólo se reporta que quedó uno de los conocidos.
+                if grep -qE "change[-_]?me|CAMBIAR|CHANGE_ME|dev-secret|_AQUI|xxxx" "$f" 2>/dev/null; then
+                    bad "$(basename "$f"): quedó un placeholder sin completar"
+                fi
+                break
+            done
         fi
 
         # ---- directorios de datos
