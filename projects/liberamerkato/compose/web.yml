@@ -8,17 +8,14 @@ services:
     container_name: liberamerkato-api
     restart: unless-stopped
     environment:
+      # La configuración de la app no viene por entorno: vive en
+      # api/config/config.prod.php, que está en el VPS y no se versiona.
+      # APP_ENV es lo único que la app lee de acá, y sólo para elegir ese
+      # archivo. COMPOSER_AUTH es de build: el entrypoint corre
+      # `composer install` y los linkedcode/* son repos privados.
       APP_ENV: ${APP_ENV:-prod}
-      DB_HOST: ${DB_HOST:-shared-mysql}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_NAME: ${DB_NAME:-liberamerkato}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
-      TZ: ${TZ:-America/Argentina/Buenos_Aires}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_ISSUER: ${JWT_ISSUER:-https://api.liberamerkato.com}
-      APP_URL: ${APP_URL:-https://api.liberamerkato.com}
       COMPOSER_AUTH: ${COMPOSER_AUTH}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
       - /var/www/liberamerkato/api:/var/www/html
       - liberamerkato_api_cache:/var/www/html/var/cache
