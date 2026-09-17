@@ -3,7 +3,7 @@
 API interna de envío de emails multi-proyecto. **No se expone al gateway ni tiene dominio
 público** — vive únicamente en la red `shared_services`, la misma que usa `shared-mysql`
 (y, si aplica, `shared-mailserver` como backend SMTP). Solo son clientes de esta API otros
-contenedores de este mismo `docker compose` (ej. `granhermano-web`, `partidodelasoledad-app`),
+contenedores de este mismo `docker compose` (ej. `granhermano-web`, `impuestounico-app`),
 que la llaman por nombre de servicio Docker: `http://ember-app/api/emails`.
 
 La administración de proyectos/API keys y el procesamiento de la cola ya no pasan por HTTP:

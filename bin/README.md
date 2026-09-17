@@ -86,7 +86,7 @@ Las variables que acepta la config están documentadas en la cabecera de
 
 Para chequeos que no entran en ese molde, la config puede definir dos funciones:
 `check_extra` (fase 1, sólo lectura) y `setup_extra` (fase 2). Ejemplos:
-`ember.conf` valida el largo de `SMTP_PASS_KEY`, y `partidodelasoledad.conf`
+`ember.conf` valida el largo de `SMTP_PASS_KEY`, y `impuestounico.conf`
 detecta un `config.php` que quedó apuntando a `localhost`.
 
 ## Diagnóstico

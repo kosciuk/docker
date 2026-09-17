@@ -87,7 +87,7 @@ Los `logs/` de cada proyecto sí se pueden leer, pero salen crudos: usar
 | zurdosanonimos | `projects/zurdosanonimos/compose/web.yml` | `docker-zurdosanonimos.service` |
 | kosciuk | `projects/kosciuk/compose/web.yml` | `docker-kosciuk.service` |
 | cooperativismoabierto | `projects/cooperativismoabierto/compose/web.yml` | `docker-cooperativismoabierto.service` |
-| partidodelasoledad | `projects/partidodelasoledad/compose/web.yml` | `docker-partidodelasoledad.service` |
+| impuestounico | `projects/impuestounico/compose/web.yml` | `docker-impuestounico.service` |
 | liberamerkato | `projects/liberamerkato/compose/web.yml` | `docker-liberamerkato.service` |
 | enforos | `projects/enforos/compose/web.yml` | `docker-enforos.service` |
 

@@ -18,7 +18,7 @@ services:
       - /var/www/liberamerkato/logs:/var/www/liberamerkato/logs
       - /var/www/enforos/logs:/var/www/enforos/logs
       - /var/www/cooperativismoabierto/logs:/var/www/cooperativismoabierto/logs
-      - /var/www/partidodelasoledad/logs:/var/www/partidodelasoledad/logs
+      - /var/www/impuestounico/logs:/var/www/impuestounico/logs
       - /var/www/perdidosyencontrados/logs:/var/www/perdidosyencontrados/logs
       - /var/www/granhermano/logs:/var/www/granhermano/logs
       - /var/www/zurdosanonimos/logs:/var/www/zurdosanonimos/logs

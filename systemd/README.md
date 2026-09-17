@@ -9,7 +9,7 @@ Estas unidades permiten administrar los stacks Docker con `systemd`.
 - `docker-granhermano.service`
 - `docker-zurdosanonimos.service`
 - `docker-cooperativismoabierto.service`
-- `docker-partidodelasoledad.service`
+- `docker-impuestounico.service`
 
 ## Instalación en el VPS
 
@@ -32,7 +32,7 @@ sudo systemctl enable docker-mysql.service
 sudo systemctl enable docker-granhermano.service
 sudo systemctl enable docker-zurdosanonimos.service
 sudo systemctl enable docker-cooperativismoabierto.service
-sudo systemctl enable docker-partidodelasoledad.service
+sudo systemctl enable docker-impuestounico.service
 sudo systemctl enable docker-gateway.service
 ```
 
@@ -43,7 +43,7 @@ sudo systemctl start docker-mysql.service
 sudo systemctl start docker-granhermano.service
 sudo systemctl start docker-zurdosanonimos.service
 sudo systemctl start docker-cooperativismoabierto.service
-sudo systemctl start docker-partidodelasoledad.service
+sudo systemctl start docker-impuestounico.service
 sudo systemctl start docker-gateway.service
 ```
 
@@ -53,7 +53,7 @@ sudo systemctl start docker-gateway.service
 - `docker-granhermano.service`
 - `docker-zurdosanonimos.service`
 - `docker-cooperativismoabierto.service`
-- `docker-partidodelasoledad.service`
+- `docker-impuestounico.service`
 - `docker-gateway.service`
 
 El gateway queda al final para que los backends ya estén arriba cuando Caddy empiece a recibir tráfico.
@@ -66,7 +66,7 @@ Después de hacer `git pull`:
 sudo systemctl restart docker-granhermano.service
 sudo systemctl restart docker-zurdosanonimos.service
 sudo systemctl restart docker-cooperativismoabierto.service
-sudo systemctl restart docker-partidodelasoledad.service
+sudo systemctl restart docker-impuestounico.service
 sudo systemctl restart docker-gateway.service
 ```
 
