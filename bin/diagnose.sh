@@ -501,6 +501,26 @@ for unit in docker-ember-cron.timer; do
     fi
 done
 
+section "Workers long-running"
+# A diferencia de los oneshot de arriba, estos deben quedar "active running"
+# todo el tiempo. Restart=always los revive solos, así que "failed" acá sí es
+# señal de algo roto de fondo (ver logs), no un estado transitorio.
+for unit in docker-liberamerkato-outbox.service; do
+    if ! systemctl list-unit-files "$unit" >/dev/null 2>&1 \
+       || ! systemctl list-unit-files --no-legend "$unit" 2>/dev/null | grep -q .; then
+        bad "$unit NO está instalado"
+        info "sin él el outbox de liberamerkato no se procesa"
+        info "sudo cp ${DOCKER}/systemd/${unit} /etc/systemd/system/"
+        info "sudo systemctl daemon-reload && sudo systemctl enable --now $unit"
+    elif systemctl is-active --quiet "$unit"; then
+        ok "$unit activo"
+    else
+        bad "$unit instalado pero NO activo"
+        info "journalctl -u $unit -n 50 --no-pager"
+        info "sudo systemctl restart $unit"
+    fi
+done
+
 echo
 echo "############ FIN"
 echo

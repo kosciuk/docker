@@ -126,6 +126,27 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now docker-liberamerkato.service
 ```
 
+### Worker del outbox
+
+Proceso long-running (no un cron) que procesa la tabla `outbox` dentro del contenedor `liberamerkato-api`. `Restart=always` lo revive si se cae; el worker atiende `SIGTERM` terminando la pasada en curso, así que un `restart` no corta un lote por la mitad.
+
+```bash
+sudo cp /var/www/docker/systemd/docker-liberamerkato-outbox.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now docker-liberamerkato-outbox.service
+```
+
+Depende de `docker-liberamerkato.service` (`BindsTo`): si el compose no está arriba, este worker tampoco arranca.
+
+Chequear estado:
+
+```bash
+sudo systemctl status docker-liberamerkato-outbox.service
+journalctl -u docker-liberamerkato-outbox.service -f
+```
+
+También lo cubre `bin/diagnose.sh`, sección "Workers long-running".
+
 ---
 
 ## Producción

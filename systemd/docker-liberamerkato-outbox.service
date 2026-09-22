@@ -1,0 +1,20 @@
+[Unit]
+Description=LiberaMerkato - worker del outbox
+# BindsTo + After: si liberamerkato-api no está levantado, esta unit no
+# arranca en lugar de reintentar cada pocos segundos contra un contenedor
+# inexistente. docker-liberamerkato.service es oneshot con
+# RemainAfterExit=yes, así que refleja si el compose está arriba.
+Requires=docker.service
+BindsTo=docker-liberamerkato.service
+After=docker.service docker-liberamerkato.service
+
+[Service]
+# Sin -d: systemd necesita seguir el proceso para poder reiniciarlo y
+# para que Restart=always tenga algo que vigilar.
+ExecStart=/usr/bin/docker exec liberamerkato-api php bin/outbox-worker
+# El worker atiende SIGTERM terminando la pasada en curso, así que un
+# restart no corta un lote por la mitad.
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
