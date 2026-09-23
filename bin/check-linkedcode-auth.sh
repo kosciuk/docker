@@ -167,7 +167,7 @@ section "Cookie de sesión"
 cookie=$(docker exec "$CONTAINER" php -r '
 require "/var/www/html/vendor/autoload.php";
 $c = Linkedcode\NotEnv\Loader::load("/var/www/html");
-foreach (["secure", "httponly", "samesite"] as $k) {
+foreach (["secure", "httponly", "same_site"] as $k) {
     printf("%s=%s\n", $k, var_export($c->get("cookie.$k", null), true));
 }' 2>/dev/null)
 
@@ -183,10 +183,10 @@ else
         esac
     done
 
-    samesite=$(printf '%s\n' "$cookie" | sed -n "s/^samesite=//p")
-    case "$samesite" in
-        "'Lax'"|"'Strict'") ok "cookie samesite $samesite" ;;
-        *)                  warn "cookie samesite $samesite" ;;
+    same_site=$(printf '%s\n' "$cookie" | sed -n "s/^same_site=//p")
+    case "$same_site" in
+        "'Lax'"|"'Strict'") ok "cookie same_site $same_site" ;;
+        *)                  warn "cookie same_site $same_site" ;;
     esac
 fi
 
