@@ -154,7 +154,8 @@ fi
 # 'prod', el chequeo de arriba está mirando el archivo equivocado.
 app_env=$(docker exec "$CONTAINER" printenv APP_ENV 2>/dev/null)
 case "$app_env" in
-    prod) ok "APP_ENV=prod" ;;
+    # notenv normaliza 'production' a 'prod' (Loader::ALIASES)
+    prod|production) ok "APP_ENV=$app_env" ;;
     "")   fail "APP_ENV no está seteado en el contenedor -> notenv usa 'dev' por default" ;;
     *)    fail "APP_ENV=$app_env (se esperaba 'prod')" ;;
 esac

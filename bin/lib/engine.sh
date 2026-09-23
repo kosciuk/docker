@@ -1,31 +1,44 @@
 #!/bin/bash
 #
-# Motor común de los bin/setup-*.sh.
+# Motor común de los bin/<proyecto>.sh.
 #
-# No se ejecuta directo: cada proyecto tiene un wrapper en bin/setup-<x>.sh que
-# hace `source` de su config en bin/projects/<x>.conf y después de este archivo.
+# No se ejecuta directo: cada proyecto tiene un wrapper en bin/<proyecto>.sh
+# que hace `source` de su config en bin/projects/<proyecto>.conf y después de
+# este archivo.
 #
-# El flujo es siempre el mismo, y está partido en dos fases:
+# Fusiona lo que antes eran dos comandos (setup-*.sh y deploy-*.sh) en uno
+# solo, idempotente: si el proyecto nunca se levantó, clona lo que falte, crea
+# directorios/redes y levanta los contenedores; si ya existe, actualiza el
+# código (git pull) y reinicia sólo si hubo cambios. Correrlo dos veces
+# seguidas sin cambios no debería reiniciar nada.
 #
-#   FASE 1 (sólo lectura)  chequea env, Docker, servicios compartidos, base de
-#                          datos, código y lo que el proyecto declare. Si algo
-#                          falla, corta SIN haber modificado nada: o el script
-#                          hace todo, o no dejó el sistema a medias.
-#   FASE 2 (modifica)      crea directorios y redes, levanta los contenedores.
+#   FASE 1 (sólo lectura)  env, Docker, servicios compartidos, DB, REPOS (si
+#                          falta clonar, NO falla -- se anota para fase 2),
+#                          DIST_DIRS, REQUIRED_FILES, keypair, y -- si el repo
+#                          ya existe -- working tree limpio, rama correcta,
+#                          acceso al remoto. Si el contenedor principal ya
+#                          está corriendo, además valida COMPOSER_AUTH contra
+#                          GitHub. Si algo falla, corta sin haber modificado
+#                          nada.
+#   FASE 2 (modifica)      clona REPOS que faltaban, git pull --ff-only en los
+#                          que ya estaban, crea DATA_DIRS/NETWORKS, docker
+#                          compose up -d [--build], y recién con el contenedor
+#                          arriba: composer install + migraciones si
+#                          USES_COMPOSER=1, reinicio sólo si hubo cambios de
+#                          código o se hizo build.
 #
-# Converge, pero no es idempotente en sentido estricto:
-#   - si cambió el compose los contenedores afectados se recrean -> corte breve
-#   - --build NO reproduce la imagen anterior: los Dockerfile usan tags móviles
-#     (php:8.4-fpm) y apt/pecl/composer sin versión fija. Por eso es opt-in.
+# No es atómico: si migrate falla a mitad de camino, el código ya actualizado
+# queda corriendo contra un schema viejo hasta que se resuelva a mano. No hay
+# rollback automático.
 #
 # ---------------------------------------------------------------------------
 # Variables que puede declarar la config del proyecto
 # ---------------------------------------------------------------------------
-# Obligatorias:
-#   PROJECT       nombre del proyecto (= directorio en projects/ y prefijo de
-#                 los contenedores, salvo que se declare CONTAINERS)
+# Obligatoria:
+#   PROJECT       nombre del proyecto (= directorio en projects/, y prefijo
+#                 por default de sus contenedores)
 #
-# Opcionales (con su default entre paréntesis):
+# Stack (con su default entre paréntesis):
 #   ROOT          raíz de datos en el VPS            (/var/www/$PROJECT)
 #   COMPOSE       ruta del compose                   (projects/$PROJECT/compose/web.yml)
 #   ENV_FILE      ruta del env                       (projects/$PROJECT/env/web.env)
@@ -37,7 +50,6 @@
 #   NETWORKS      redes a crear                      (shared_services projects_public)
 #   DATA_DIRS     directorios a crear bajo ROOT      (vacío)
 #   WRITABLE_DIRS directorios que www-data debe poder escribir (vacío)
-#   REPOS         "ruta|url" por repo que debe estar clonado   (vacío)
 #   DIST_DIRS     rutas que deben existir con contenido compilado (vacío)
 #   REQUIRED_FILES "ruta|explicación" de archivos que deben existir (vacío)
 #   DB_SOURCE     de dónde salen las credenciales: env | config | none  (env)
@@ -50,9 +62,20 @@
 #   SUPPORTS_BUILD 1 si acepta --build               (1)
 #   POST_MSG      texto extra para el final          (vacío)
 #
+# Código y deploy:
+#   REPOS         "ruta|url" por repo que debe estar clonado   (vacío)
+#   DEPLOY_BRANCH rama a la que hacer pull                     (main)
+#   USES_COMPOSER 1 si corre composer install/migrate adentro  (0)
+#   MIGRATE_CONTAINER contenedor donde correr composer/migrate (primer container
+#                                                                de CONTAINERS)
+#   MIGRATE       1 si además de composer corre vendor/bin/migrate (1, ignorado
+#                                                                    si USES_COMPOSER=0)
+#   RESTART_CONTAINERS contenedores a reiniciar si hubo cambios de código
+#                                                                (CONTAINERS)
+#
 # Hooks opcionales: si la config define estas funciones, se llaman en su fase.
-#   check_extra   chequeos propios del proyecto (fase 1, sólo lectura)
-#   setup_extra   pasos propios del proyecto (fase 2)
+#   check_extra     chequeos propios del proyecto (fase 1, sólo lectura)
+#   converge_extra  pasos propios del proyecto (fase 2, después de migrate)
 #
 set -uo pipefail
 
@@ -76,42 +99,68 @@ KEYPAIR_DIR="${KEYPAIR_DIR:-}"
 SUPPORTS_BUILD="${SUPPORTS_BUILD:-1}"
 POST_MSG="${POST_MSG:-}"
 
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
+USES_COMPOSER="${USES_COMPOSER:-0}"
+MIGRATE="${MIGRATE:-1}"
+
 # Arrays: se declaran vacíos si la config no los definió.
-declare -p NETWORKS      >/dev/null 2>&1 || NETWORKS=(shared_services projects_public)
-declare -p DATA_DIRS     >/dev/null 2>&1 || DATA_DIRS=()
-declare -p WRITABLE_DIRS >/dev/null 2>&1 || WRITABLE_DIRS=()
-declare -p REPOS         >/dev/null 2>&1 || REPOS=()
-declare -p DIST_DIRS     >/dev/null 2>&1 || DIST_DIRS=()
+declare -p NETWORKS       >/dev/null 2>&1 || NETWORKS=(shared_services projects_public)
+declare -p DATA_DIRS      >/dev/null 2>&1 || DATA_DIRS=()
+declare -p WRITABLE_DIRS  >/dev/null 2>&1 || WRITABLE_DIRS=()
+declare -p REPOS          >/dev/null 2>&1 || REPOS=()
+declare -p DIST_DIRS      >/dev/null 2>&1 || DIST_DIRS=()
 declare -p REQUIRED_FILES >/dev/null 2>&1 || REQUIRED_FILES=()
-declare -p SERVICES      >/dev/null 2>&1 || SERVICES=()
-declare -p CONTAINERS    >/dev/null 2>&1 || CONTAINERS=()
-declare -p SYSTEMD_UNITS >/dev/null 2>&1 || SYSTEMD_UNITS=()
+declare -p SERVICES       >/dev/null 2>&1 || SERVICES=()
+declare -p CONTAINERS     >/dev/null 2>&1 || CONTAINERS=()
+declare -p SYSTEMD_UNITS  >/dev/null 2>&1 || SYSTEMD_UNITS=()
 
 # Si no se declararon contenedores, se derivan de los servicios.
 if [ "${#CONTAINERS[@]}" -eq 0 ] && [ "${#SERVICES[@]}" -gt 0 ]; then
     for _svc in "${SERVICES[@]}"; do CONTAINERS+=("${PROJECT}-${_svc}"); done
 fi
 
+# El contenedor de composer/migrate es explícito si se declaró; si no, el
+# primero de CONTAINERS. Proyectos con auth+www o api+app+img+www comparten
+# PROJECT o tienen contenedores que no siguen $PROJECT-api (ember-app,
+# linkedcode-auth): por eso no hay un default "ciego" tipo $PROJECT-api.
+if [ -z "${MIGRATE_CONTAINER:-}" ]; then
+    MIGRATE_CONTAINER="${CONTAINERS[0]:-}"
+fi
+
+declare -p RESTART_CONTAINERS >/dev/null 2>&1 || RESTART_CONTAINERS=("${CONTAINERS[@]}")
+
+# DEPLOY_ROOT: repo sobre el que corren git pull/composer/migrate.
+if [ -z "${DEPLOY_ROOT:-}" ]; then
+    if [ "${#REPOS[@]}" -gt 0 ]; then
+        DEPLOY_ROOT="${REPOS[0]%%|*}"
+    else
+        DEPLOY_ROOT="$ROOT"
+    fi
+fi
+
 # ------------------------------------------------------------------ argumentos
 
 BUILD=0
-case "${1:-}" in
-    --build)
-        if [ "$SUPPORTS_BUILD" -eq 1 ]; then
-            BUILD=1
-        else
-            echo "uso: $0            ($PROJECT no acepta --build: usa una imagen ya publicada)"
-            exit 2
-        fi ;;
-    "") ;;
-    *)
-        if [ "$SUPPORTS_BUILD" -eq 1 ]; then
-            echo "uso: $0 [--build]"
-        else
-            echo "uso: $0"
-        fi
-        exit 2 ;;
-esac
+DRY_RUN=0
+for arg in "$@"; do
+    case "$arg" in
+        --build)
+            if [ "$SUPPORTS_BUILD" -eq 1 ]; then
+                BUILD=1
+            else
+                echo "uso: $0 [--dry-run]  ($PROJECT no acepta --build: usa una imagen ya publicada)"
+                exit 2
+            fi ;;
+        --dry-run) DRY_RUN=1 ;;
+        *)
+            if [ "$SUPPORTS_BUILD" -eq 1 ]; then
+                echo "uso: $0 [--build] [--dry-run]"
+            else
+                echo "uso: $0 [--dry-run]"
+            fi
+            exit 2 ;;
+    esac
+done
 
 # -------------------------------------------------------------------- helpers
 
@@ -127,12 +176,14 @@ section() { echo; echo "==> $1"; }
 # Un solo docker inspect por consulta, detrás de un nombre legible.
 running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = "true" ]; }
 
+dc() { docker exec -w /var/www/html "$MIGRATE_CONTAINER" "$@"; }
+
 # =============================================================================
 # FASE 1 - sólo lectura
 #
 # Nada de acá modifica el sistema. Los chequeos caros (MySQL, base de datos)
-# van antes de crear nada, para que un problema de configuración no deje el
-# sistema a medio armar.
+# van antes de cualquier otra cosa, para que un problema de configuración no
+# deje el sistema a medio armar.
 # =============================================================================
 
 section "Requisitos"
@@ -206,19 +257,21 @@ fi
 
 # ------------------------------------------------------------------- código
 
+# REPOS que faltan NO son un fail acá: fase 2 los clona. Se anotan en
+# repos_missing para no repetir el `[ -d .git ]` en fase 2.
+declare -a repos_missing=()
+
 if [ "${#REPOS[@]}" -gt 0 ] || [ "${#DIST_DIRS[@]}" -gt 0 ]; then
     section "Código"
 
-    # Los contenedores montan estos directorios. Si no están clonados, Docker
-    # los crearía vacíos y los contenedores levantarían sin aplicación adentro.
     for entry in "${REPOS[@]}"; do
         path="${entry%%|*}"
         url="${entry##*|}"
         if [ -d "${path}/.git" ]; then
             ok "${path} clonado"
         else
-            fail "falta clonar ${path}"
-            echo "           git clone ${url} ${path}"
+            warn "falta clonar ${path} (se clona en esta misma corrida)"
+            repos_missing+=("$entry")
         fi
     done
 
@@ -230,6 +283,45 @@ if [ "${#REPOS[@]}" -gt 0 ] || [ "${#DIST_DIRS[@]}" -gt 0 ]; then
             echo "           el contenedor lo monta: compilar la SPA y subirla"
         fi
     done
+fi
+
+# El repo de deploy (DEPLOY_ROOT) sólo se valida si ya está clonado: si es la
+# primera vez (setup desde cero) fase 2 lo clona y no hay nada que chequear.
+deploy_root_exists=0
+if [ -d "$DEPLOY_ROOT/.git" ]; then
+    deploy_root_exists=1
+    section "Repo de deploy ($DEPLOY_ROOT)"
+
+    # Un pull sobre un working tree sucio puede fallar a mitad de camino o,
+    # peor, mezclar el cambio local con lo que viene de git. Se corta antes.
+    dirty=$(git -C "$DEPLOY_ROOT" status --porcelain)
+    if [ -n "$dirty" ]; then
+        fail "$DEPLOY_ROOT tiene cambios sin commitear"
+        echo "$dirty" | sed 's/^/           /'
+        echo "           commitear, descartar (git checkout --) o guardarlos (git stash)"
+    else
+        ok "working tree limpio"
+    fi
+
+    branch=$(git -C "$DEPLOY_ROOT" branch --show-current)
+    if [ "$branch" != "$DEPLOY_BRANCH" ]; then
+        fail "el repo está en '$branch', se esperaba '$DEPLOY_BRANCH'"
+    else
+        ok "en la rama $DEPLOY_BRANCH"
+    fi
+
+    # git pull usa el remote configurado (SSH con su propia clave, en general).
+    # Probarlo con ls-remote autentica sin traer nada -- así una clave vencida
+    # corta acá, no a mitad del pull.
+    remote=$(git -C "$DEPLOY_ROOT" remote get-url origin 2>/dev/null)
+    if [ -z "$remote" ]; then
+        fail "no se pudo leer el remote 'origin' de $DEPLOY_ROOT"
+    elif git -C "$DEPLOY_ROOT" ls-remote --exit-code origin "$DEPLOY_BRANCH" >/dev/null 2>&1; then
+        ok "acceso a git remoto ($remote)"
+    else
+        fail "no hay acceso a $remote"
+        echo "           revisar la clave SSH del host (~/.ssh/config) o el token, según el tipo de remote"
+    fi
 fi
 
 # ------------------------------------------------------- archivos requeridos
@@ -331,6 +423,35 @@ if [ "$DB_SOURCE" != "none" ]; then
     fi
 fi
 
+# --------------------------------------------------------------- COMPOSER_AUTH
+
+# Sólo se prueba si el contenedor de composer ya existe y corre: si el stack
+# nunca se levantó no hay nada contra qué probarlo, y no es un fail -- fase 2
+# recién va a correr composer después de levantar.
+if [ "$USES_COMPOSER" -eq 1 ] && [ -n "$MIGRATE_CONTAINER" ]; then
+    if running "$MIGRATE_CONTAINER"; then
+        # COMPOSER_AUTH es el token que composer install usa adentro del
+        # contenedor para bajar paquetes VCS de GitHub. Se prueba contra la
+        # API sin instalar nada: un 401 ahí anticipa que composer install
+        # fallaría.
+        auth_check=$(docker exec "$MIGRATE_CONTAINER" sh -c '
+            [ -z "$COMPOSER_AUTH" ] && exit 2
+            token=$(printf %s "$COMPOSER_AUTH" | sed -n "s/.*\"github-oauth\"[^{]*{[^}]*\"github.com\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p")
+            [ -z "$token" ] && exit 2
+            code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $token" https://api.github.com/rate_limit)
+            [ "$code" = "200" ] && exit 0 || exit 1
+        ' 2>/dev/null; echo $?)
+
+        case "$auth_check" in
+            0) ok "COMPOSER_AUTH válido contra GitHub" ;;
+            2) warn "COMPOSER_AUTH no definido o con formato inesperado -- no se pudo probar" ;;
+            *) fail "COMPOSER_AUTH inválido o vencido (GitHub rechazó el token)" ;;
+        esac
+    else
+        warn "$MIGRATE_CONTAINER no está corriendo todavía -- no se prueba COMPOSER_AUTH"
+    fi
+fi
+
 # Chequeos propios del proyecto, si los declaró.
 if declare -F check_extra >/dev/null; then
     check_extra
@@ -346,9 +467,84 @@ if [ "$fails" -gt 0 ]; then
     exit 1
 fi
 
+if [ "$DRY_RUN" -eq 1 ]; then
+    echo
+    echo "==> --dry-run: no se modifica nada"
+
+    if [ "${#repos_missing[@]}" -gt 0 ]; then
+        echo "  Se clonarían:"
+        for entry in "${repos_missing[@]}"; do
+            echo "    ${entry%%|*}  <-  ${entry##*|}"
+        done
+    fi
+
+    if [ "$deploy_root_exists" -eq 1 ]; then
+        if git -C "$DEPLOY_ROOT" fetch origin "$DEPLOY_BRANCH" 2>&1 | sed 's/^/  /'; then
+            ahead=$(git -C "$DEPLOY_ROOT" log HEAD..origin/"$DEPLOY_BRANCH" --oneline)
+            if [ -n "$ahead" ]; then
+                echo "  Commits nuevos en origin/$DEPLOY_BRANCH:"
+                echo "$ahead" | sed 's/^/    /'
+            else
+                echo "  $DEPLOY_ROOT ya está al día con origin/$DEPLOY_BRANCH."
+            fi
+        else
+            echo "  no se pudo hacer fetch en $DEPLOY_ROOT"
+        fi
+    fi
+
+    if [ "$BUILD" -eq 1 ]; then
+        echo "  Se correría: docker compose up -d --build ${SERVICES[*]:-}"
+    else
+        echo "  Se correría: docker compose up -d ${SERVICES[*]:-}"
+    fi
+
+    exit 0
+fi
+
 # =============================================================================
 # FASE 2 - a partir de acá sí se modifica el sistema
 # =============================================================================
+
+code_changed=0
+
+if [ "${#repos_missing[@]}" -gt 0 ] || [ "$deploy_root_exists" -eq 1 ]; then
+    section "Código"
+
+    for entry in "${repos_missing[@]}"; do
+        path="${entry%%|*}"
+        url="${entry##*|}"
+        if git clone "$url" "$path"; then
+            ok "${path} clonado"
+            code_changed=1
+        else
+            fail "no se pudo clonar ${path}"
+        fi
+    done
+
+    if [ "$deploy_root_exists" -eq 1 ]; then
+        before=$(git -C "$DEPLOY_ROOT" rev-parse HEAD)
+        if ! git -C "$DEPLOY_ROOT" pull --ff-only origin "$DEPLOY_BRANCH"; then
+            fail "git pull falló en $DEPLOY_ROOT"
+            echo "           --ff-only rechaza un merge: si divergió, resolver a mano"
+        else
+            after=$(git -C "$DEPLOY_ROOT" rev-parse HEAD)
+            if [ "$before" = "$after" ]; then
+                ok "$DEPLOY_ROOT sin cambios (ya estaba al día)"
+            else
+                ok "$DEPLOY_ROOT actualizado $before -> $after"
+                git -C "$DEPLOY_ROOT" log --oneline "${before}..${after}" | sed 's/^/           /'
+                code_changed=1
+            fi
+        fi
+    fi
+fi
+
+if [ "$fails" -gt 0 ]; then
+    echo
+    echo "==> Corto acá"
+    echo "  $fails falla(s) clonando/actualizando código. Reviso antes de seguir."
+    exit 1
+fi
 
 if [ "${#DATA_DIRS[@]}" -gt 0 ]; then
     section "Directorios en $ROOT"
@@ -391,23 +587,20 @@ if [ "${#NETWORKS[@]}" -gt 0 ]; then
     done
 fi
 
-# Pasos propios del proyecto, si los declaró.
-if declare -F setup_extra >/dev/null; then
-    setup_extra
+if [ "$fails" -gt 0 ]; then
+    echo
+    echo "==> Corto acá"
+    echo "  $fails falla(s) preparando directorios/redes: no levanto el stack."
+    exit 1
 fi
 
 section "Stack de ${PROJECT}"
-
-if [ "$fails" -gt 0 ]; then
-    echo "  Hay $fails falla(s) arriba: no levanto el stack."
-    exit 1
-fi
 
 up_args=(up -d)
 [ "$BUILD" -eq 1 ] && up_args+=(--build)
 
 # SERVICES vacío = todo el compose. Con servicios nombrados, los demás quedan
-# intactos (así setup-linkedcode-auth no toca linkedcode-www).
+# intactos (así bin/linkedcode-auth.sh no toca linkedcode-www).
 compose_args=()
 [ -f "$ENV_FILE" ] && compose_args+=(--env-file "$ENV_FILE")
 compose_args+=(-f "$COMPOSE")
@@ -435,6 +628,86 @@ if [ "${#CONTAINERS[@]}" -gt 0 ]; then
             fail "$name NO está corriendo -> docker logs $name"
         fi
     done
+fi
+
+if [ "$fails" -gt 0 ]; then
+    echo
+    echo "==> Corto acá"
+    echo "  $fails falla(s) levantando contenedores. No corro composer/migrate."
+    exit 1
+fi
+
+# ------------------------------------------------------------ composer/migrate
+
+if [ "$USES_COMPOSER" -eq 1 ] && [ -n "$MIGRATE_CONTAINER" ]; then
+    section "composer install"
+
+    # --no-dev: mismo criterio que el resto del stack, que corre en production.
+    if ! dc composer install --no-dev -o --no-interaction; then
+        fail "composer install falló en $MIGRATE_CONTAINER"
+        exit 1
+    fi
+    ok "dependencias instaladas"
+
+    if [ "$MIGRATE" -eq 1 ]; then
+        section "Migraciones"
+
+        if ! dc test -x vendor/bin/migrate; then
+            warn "no hay vendor/bin/migrate en $MIGRATE_CONTAINER -- ¿el paquete linkedcode/infra está instalado?"
+        else
+            migrate_out=$(dc vendor/bin/migrate --dry-run 2>&1)
+            migrate_status=$?
+
+            if [ "$migrate_status" -ne 0 ]; then
+                fail "vendor/bin/migrate --dry-run falló"
+                echo "$migrate_out" | sed 's/^/           /'
+                exit 1
+            fi
+
+            if echo "$migrate_out" | grep -q '^No hay migraciones pendientes'; then
+                ok "sin migraciones pendientes"
+            else
+                echo "$migrate_out" | sed 's/^/           /'
+                if ! dc vendor/bin/migrate; then
+                    fail "vendor/bin/migrate falló -- revisar qué quedó aplicado antes de reintentar"
+                    exit 1
+                fi
+                ok "migraciones aplicadas"
+                code_changed=1
+            fi
+        fi
+    fi
+fi
+
+# Pasos propios del proyecto, si los declaró.
+if declare -F converge_extra >/dev/null; then
+    section "Pasos propios de ${PROJECT}"
+    converge_extra
+fi
+
+section "Reinicio"
+
+# Idempotencia: si no hubo pull con commits nuevos, ni clone nuevo, ni migrate
+# aplicado, ni --build, no hay nada que el `up -d` no haya resuelto ya solo
+# (recrea el contenedor si cambió el compose). Reiniciar de más acá sólo corta
+# el servicio sin necesidad.
+if [ "$code_changed" -eq 1 ] || [ "$BUILD" -eq 1 ]; then
+    if [ "$USES_COMPOSER" -eq 1 ] && [ -n "$MIGRATE_CONTAINER" ]; then
+        # El cache de DI compilado queda con el código viejo embebido -- si no
+        # se borra, el contenedor arranca sirviendo la versión anterior aunque
+        # git y composer ya estén actualizados.
+        dc rm -f var/cache/CompiledContainer.php 2>/dev/null || true
+    fi
+
+    for c in "${RESTART_CONTAINERS[@]}"; do
+        if docker restart "$c" >/dev/null 2>&1; then
+            ok "$c reiniciado"
+        else
+            fail "no se pudo reiniciar $c"
+        fi
+    done
+else
+    ok "sin cambios de código -- no hace falta reiniciar"
 fi
 
 if [ "${#SYSTEMD_UNITS[@]}" -gt 0 ]; then

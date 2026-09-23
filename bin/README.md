@@ -2,23 +2,26 @@
 
 Scripts operativos para correr **en el VPS**.
 
-## Setup por proyecto
+## Converger un proyecto
 
-`setup-<proyecto>.sh` deja un proyecto listo para levantar: verifica lo que
-necesita, crea directorios y redes, y levanta los contenedores.
+`<proyecto>.sh` deja un proyecto listo y actualizado: en la misma corrida crea
+lo que falte (clona el repo si no está, directorios, redes, contenedores) y
+actualiza el código a lo último (`git pull`, `composer install`,
+migraciones). Reemplaza a los viejos `setup-<x>.sh` + `deploy-<x>.sh`.
 
 ```bash
-./bin/setup-enforos.sh           # converge el stack (sin rebuild)
-./bin/setup-enforos.sh --build   # además reconstruye las imágenes
+./bin/enforos.sh           # converge y actualiza (sin rebuild)
+./bin/enforos.sh --build   # además reconstruye las imágenes
+./bin/enforos.sh --dry-run # sólo muestra qué cambiaría
 ```
 
 Todos comparten un motor y se diferencian sólo por su archivo de configuración:
 
 ```
 bin/
-├── setup-<proyecto>.sh     # wrapper de 18 líneas: carga la config y el motor
+├── <proyecto>.sh            # wrapper: carga la config y el motor
 ├── projects/<proyecto>.conf # qué tiene de particular este proyecto
-└── lib/setup-engine.sh     # el flujo, igual para todos
+└── lib/engine.sh            # el flujo, igual para todos
 ```
 
 ### Cómo corren
@@ -26,10 +29,15 @@ bin/
 Los scripts trabajan en **dos fases**:
 
 1. **Sólo lectura** — env completo, Docker accesible, servicios compartidos
-   arriba, base de datos accesible, repos clonados, y lo que el proyecto
-   declare. Si algo falla, corta ahí **sin haber modificado nada**, y muestra
-   todos los problemas juntos en vez del primero.
-2. **Modifica** — directorios, redes, `docker compose up`.
+   arriba, base de datos accesible, repos (working tree limpio, rama, acceso
+   al remoto -- si falta clonar, sólo se anota), COMPOSER_AUTH si el
+   contenedor ya corre, y lo que el proyecto declare. Si algo falla, corta ahí
+   **sin haber modificado nada**, y muestra todos los problemas juntos en vez
+   del primero.
+2. **Modifica** — clona/actualiza repos, directorios, redes,
+   `docker compose up`, y con el contenedor arriba: `composer install` +
+   migraciones si el proyecto los usa, reinicio sólo si hubo cambios de
+   código.
 
 Se pueden correr de nuevo sin romper nada ni duplicar recursos. Ojo: **convergen,
 no son idempotentes en sentido estricto**. Si cambió el `compose.yml` los
@@ -59,35 +67,36 @@ REPOS=("/var/www/miproyecto/api|git@github.com:miproyecto/api.git")
 PLACEHOLDERS='^(DB_PASS|COMPOSER_AUTH)=[[:space:]]*$|CAMBIAR'
 ```
 
-Y el wrapper `bin/setup-miproyecto.sh`:
+Y el wrapper `bin/miproyecto.sh`:
 
 ```bash
 #!/bin/bash
 set -uo pipefail
 DOCKER="${DOCKER:-/var/www/docker}"
 source "${DOCKER}/bin/projects/miproyecto.conf"
-source "${DOCKER}/bin/lib/setup-engine.sh"
+source "${DOCKER}/bin/lib/engine.sh"
 ```
 
 Las variables que acepta la config están documentadas en la cabecera de
-`lib/setup-engine.sh`. Las más usadas:
+`lib/engine.sh`. Las más usadas:
 
 | Variable | Para qué |
 |---|---|
 | `DATA_DIRS` | directorios a crear bajo `ROOT` |
 | `WRITABLE_DIRS` | los que `www-data` debe poder escribir (uploads) |
 | `SERVICES` | servicios del compose a levantar (vacío = todos) |
-| `REPOS` | `"ruta\|url"` de lo que tiene que estar clonado |
+| `REPOS` | `"ruta\|url"` de lo que tiene que estar clonado (se clona si falta) |
 | `DB_SOURCE` | `env` (default), `config` (lee `config.php`) o `none` |
 | `NEEDS_MYSQL` / `NEEDS_GATEWAY` | `0` si no depende de ese servicio |
+| `USES_COMPOSER` | `1` si corre `composer install` + migraciones en el contenedor |
+| `MIGRATE_CONTAINER` | dónde correrlos (default: el primero de `CONTAINERS`) |
 | `SYSTEMD_UNITS` | units que deberían estar activas |
 | `REQUIRED_FILES` | `"ruta\|explicación"` de archivos sin los que no arranca |
 | `KEYPAIR_DIR` | directorio con `private.key`/`public.key` a verificar |
 
 Para chequeos que no entran en ese molde, la config puede definir dos funciones:
-`check_extra` (fase 1, sólo lectura) y `setup_extra` (fase 2). Ejemplos:
-`ember.conf` valida el largo de `SMTP_PASS_KEY`, y `impuestounico.conf`
-detecta un `config.php` que quedó apuntando a `localhost`.
+`check_extra` (fase 1, sólo lectura) y `converge_extra` (fase 2, al final).
+Ejemplo: `ember.conf` valida el largo de `SMTP_PASS_KEY`.
 
 ## Diagnóstico
 
@@ -114,8 +123,9 @@ en producción con el sitio andando.
 cuántos caracteres tiene, y marca los que quedaron con un placeholder. Así la
 salida se puede pegar en un chat o un issue sin filtrar credenciales.
 
-Es el complemento de los `setup-*.sh`: aquéllos verifican lo necesario para
-levantar un proyecto, éste responde "qué está pasando" cuando algo ya está roto.
+Es el complemento de los `<proyecto>.sh`: aquéllos verifican lo necesario para
+levantar y actualizar un proyecto, éste responde "qué está pasando" cuando
+algo ya está roto.
 
 ## Limpieza de disco
 
