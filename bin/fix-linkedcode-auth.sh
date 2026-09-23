@@ -11,17 +11,13 @@
 #                  dentro del contenedor. Corregí esto cuando el error log dice
 #                  "Permission denied" leyendo esas claves: 600 en el host no
 #                  alcanza si el dueño no es www-data (uid 33) puertas adentro.
-#   config-cache   borra var/cache/config.php. Corregí esto cuando cambiaste
-#                  config.php o common.php y no ves el efecto: Loader cachea el
-#                  merge sin comparar fechas, así que un config.php nuevo no
-#                  aplica hasta que el caché se borre o expire.
 #
 set -euo pipefail
 
 CONTAINER="linkedcode-auth"
 
 usage() {
-    echo "Uso: $0 <key-perms|config-cache>"
+    echo "Uso: $0 <key-perms>"
     exit 1
 }
 
@@ -46,17 +42,9 @@ fix_key_perms() {
     done
 }
 
-fix_config_cache() {
-    require_running
-    echo "==> borrando var/cache/config.php"
-    docker exec "$CONTAINER" rm -f /var/www/html/var/cache/config.php
-    echo "    listo: el próximo request reconstruye la config desde common.php + config.php"
-}
-
 [ $# -eq 1 ] || usage
 
 case "$1" in
-    key-perms)    fix_key_perms ;;
-    config-cache) fix_config_cache ;;
-    *)            usage ;;
+    key-perms) fix_key_perms ;;
+    *)         usage ;;
 esac

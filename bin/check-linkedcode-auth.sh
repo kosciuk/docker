@@ -9,7 +9,9 @@ set -uo pipefail
 
 CONTAINER="linkedcode-auth"
 GATEWAY="shared-gateway"
-APP_CONFIG="/var/www/linkedcode/auth.linkedcode.com/config/config.php"
+CONFIG_DIR="/var/www/linkedcode/auth.linkedcode.com/config"
+COMMON_CONFIG="${CONFIG_DIR}/common.php"
+ENV_CONFIG="${CONFIG_DIR}/config.prod.php"
 
 fails=0
 warns=0
@@ -106,33 +108,56 @@ fi
 
 # ------------------------------------------------------------------ config app
 
-section "Config de la app"
+section "Config de la app (notenv)"
 
-if [ -f "$APP_CONFIG" ]; then
-    if grep -q "CHANGE_ME" "$APP_CONFIG"; then
-        fail "config.php todavía tiene secretos CHANGE_ME_*"
-        grep -n "CHANGE_ME" "$APP_CONFIG" | sed 's/^/           /'
+# common.php es obligatorio para Loader::load(): si falta, la app ni arranca.
+if [ -f "$COMMON_CONFIG" ]; then
+    ok "common.php presente"
+else
+    fail "no se encontró $COMMON_CONFIG"
+fi
+
+# config.prod.php es opcional para notenv (Loader::load() no falla si falta),
+# pero eso es justo el riesgo acá: sin él, la app arranca igual pero sirviendo
+# los valores de common.php sin overrides de producción -- falla silenciosa,
+# no un error al levantar.
+if [ -f "$ENV_CONFIG" ]; then
+    ok "config.prod.php presente"
+
+    if grep -q "CHANGE_ME" "$ENV_CONFIG"; then
+        fail "config.prod.php todavía tiene secretos CHANGE_ME_*"
+        grep -n "CHANGE_ME" "$ENV_CONFIG" | sed 's/^/           /'
     else
         ok "sin placeholders CHANGE_ME"
     fi
 
     # verify_ssl en false es lo correcto en local (certificados self-signed),
     # pero en el VPS deja las llamadas a ember sin validar el certificado.
-    if grep -q "'verify_ssl' => false" "$APP_CONFIG"; then
+    if grep -q "'verify_ssl' => false" "$ENV_CONFIG"; then
         fail "mail_api.verify_ssl está en false"
     else
         ok "mail_api.verify_ssl activo"
     fi
 
-    if grep -q "linkedcode.local" "$APP_CONFIG"; then
-        fail "config.php apunta a hosts .local (entorno de desarrollo)"
-        grep -n "linkedcode.local" "$APP_CONFIG" | sed 's/^/           /'
+    if grep -q "linkedcode.local" "$ENV_CONFIG"; then
+        fail "config.prod.php apunta a hosts .local (entorno de desarrollo)"
+        grep -n "linkedcode.local" "$ENV_CONFIG" | sed 's/^/           /'
     else
         ok "sin hosts .local"
     fi
 else
-    fail "no se encontró $APP_CONFIG"
+    fail "no se encontró $ENV_CONFIG -- la app arranca igual pero sin overrides de prod"
+    echo "           APP_ENV=prod busca config/config.prod.php; sin él usa sólo common.php"
 fi
+
+# APP_ENV es lo único que decide qué config.<env>.php se carga -- si no está en
+# 'prod', el chequeo de arriba está mirando el archivo equivocado.
+app_env=$(docker exec "$CONTAINER" printenv APP_ENV 2>/dev/null)
+case "$app_env" in
+    prod) ok "APP_ENV=prod" ;;
+    "")   fail "APP_ENV no está seteado en el contenedor -> notenv usa 'dev' por default" ;;
+    *)    fail "APP_ENV=$app_env (se esperaba 'prod')" ;;
+esac
 
 # La config efectiva es el merge de common.php con config.php, así que grepear
 # los archivos no alcanza: se le pregunta a la app por el valor que realmente usa.
@@ -140,7 +165,7 @@ section "Cookie de sesión"
 
 cookie=$(docker exec "$CONTAINER" php -r '
 require "/var/www/html/vendor/autoload.php";
-$c = Linkedcode\NotEnv\Loader::reload("/var/www/html");
+$c = Linkedcode\NotEnv\Loader::load("/var/www/html");
 foreach (["secure", "httponly", "samesite"] as $k) {
     printf("%s=%s\n", $k, var_export($c->get("cookie.$k", null), true));
 }' 2>/dev/null)
@@ -163,26 +188,6 @@ else
         *)                  warn "cookie samesite $samesite" ;;
     esac
 fi
-
-# Loader cachea el merge y no compara fechas: si el caché es más viejo que los
-# archivos, la app sigue sirviendo la config anterior aunque el deploy ya pasó.
-section "Caché de config"
-
-stale=$(docker exec "$CONTAINER" sh -c '
-cache=/var/www/html/var/cache/config.php
-[ -f "$cache" ] || { echo "sin-cache"; exit 0; }
-for f in /var/www/html/config/common.php /var/www/html/config/config.php; do
-    [ "$f" -nt "$cache" ] && { echo "rancio"; exit 0; }
-done
-echo "fresco"' 2>/dev/null)
-
-case "$stale" in
-    fresco)    ok "el caché está al día" ;;
-    sin-cache) ok "sin caché: se reconstruye en el próximo request" ;;
-    rancio)    fail "var/cache/config.php es más viejo que la config -> borralo"
-               echo "           docker exec $CONTAINER rm -f /var/www/html/var/cache/config.php" ;;
-    *)         warn "no se pudo revisar el caché de config" ;;
-esac
 
 # Las claves OAuth no deben ser legibles por otros usuarios del sistema, pero
 # eso no alcanza: hay que probar que el proceso del contenedor (www-data) las
