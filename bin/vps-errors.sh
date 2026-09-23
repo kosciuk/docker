@@ -2,13 +2,13 @@
 #
 # Errores recientes de cada sitio, agrupados y en una línea por error.
 #
-#   ./bin/errors.sh                    # todos los proyectos, últimas 24h
-#   ./bin/errors.sh enforos            # sólo uno
-#   ./bin/errors.sh enforos 2h         # otra ventana
-#   ./bin/errors.sh --all              # sin agrupar: cada ocurrencia
-#   ./bin/errors.sh -q                 # sólo proyectos con algo para mostrar
+#   ./bin/vps-errors.sh                    # todos los proyectos, últimas 24h
+#   ./bin/vps-errors.sh enforos            # sólo uno
+#   ./bin/vps-errors.sh enforos 2h         # otra ventana
+#   ./bin/vps-errors.sh --all              # sin agrupar: cada ocurrencia
+#   ./bin/vps-errors.sh -q                 # sólo proyectos con algo para mostrar
 #
-# A diferencia de diagnose.sh, que sólo dice "hay N líneas con error", esto
+# A diferencia de vps-diagnose.sh, que sólo dice "hay N líneas con error", esto
 # muestra CUÁLES. El objetivo es que entre en pantalla: de cada error se
 # imprime la primera línea (mensaje + archivo), nunca el stack trace, y las
 # repeticiones se cuentan en vez de repetirse.

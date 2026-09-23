@@ -19,10 +19,10 @@ docker info >/dev/null 2>&1 && echo "VPS" || echo "local"
 
 Sí se pueden correr los comandos de este documento. Con dos límites:
 
-- **Sólo lectura sin avisar.** `docker ps`, `docker logs`, `bin/diagnose.sh`,
-  `bin/errors.sh`, `bin/check-gateway.sh` (sin `--fix`) se pueden correr libremente.
+- **Sólo lectura sin avisar.** `docker ps`, `docker logs`, `bin/vps-diagnose.sh`,
+  `bin/vps-errors.sh`, `bin/vps-check-gateway.sh` (sin `--fix`) se pueden correr libremente.
 - **Todo lo que modifique se consulta primero**: `up`, `down`, `restart`, `systemctl`,
-  los `bin/setup-*.sh`, `bin/cleanup.sh --apply`. Son siete proyectos en producción
+  `bin/<proyecto>.sh` y `bin/vps-cleanup.sh --apply`. Son siete proyectos en producción
   sobre servicios compartidos: reiniciar `shared-gateway` o `shared-mysql` los afecta
   a todos, y `docker compose down -v` sobre MySQL **borra los datos de todos**.
 
@@ -40,7 +40,7 @@ apps ni los `private.key`. Si hace falta saber si una variable está definida,
 verificar que exista la clave, no mostrar el valor.
 
 Los `logs/` de cada proyecto sí se pueden leer, pero salen crudos: usar
-`bin/errors.sh`, que los tacha (ver abajo). Un `grep` directo al `app.log` no.
+`bin/vps-errors.sh`, que los tacha (ver abajo). Un `grep` directo al `app.log` no.
 
 ## Estructura
 ```
@@ -93,12 +93,12 @@ Los `logs/` de cada proyecto sí se pueden leer, pero salen crudos: usar
 
 ## Comandos frecuentes
 ```bash
-./bin/diagnose.sh                            # radiografía del VPS (sólo lee)
-./bin/errors.sh                              # errores recientes por sitio (sólo lee)
-./bin/errors.sh enforos 2h                   # un proyecto, otra ventana
-./bin/check-gateway.sh                       # gateway desalineado (sólo lee)
-./bin/cleanup.sh                             # liberar disco (simulación)
-./bin/cleanup.sh --apply                     # liberar disco (ejecuta)
+./bin/vps-diagnose.sh                            # radiografía del VPS (sólo lee)
+./bin/vps-errors.sh                              # errores recientes por sitio (sólo lee)
+./bin/vps-errors.sh enforos 2h                   # un proyecto, otra ventana
+./bin/vps-check-gateway.sh                       # gateway desalineado (sólo lee)
+./bin/vps-cleanup.sh                             # liberar disco (simulación)
+./bin/vps-cleanup.sh --apply                     # liberar disco (ejecuta)
 
 docker ps                                    # ver contenedores
 docker logs -f shared-mysql                  # logs MySQL
@@ -127,7 +127,7 @@ limpia la *respuesta* HTTP (los 5xx salen con un detail genérico), pero manda a
 logger el `getMessage()` crudo y la excepción entera con su trace. En `app.log`
 hay SQL con valores, paths, mails e IPs.
 
-Por eso `bin/errors.sh` y `bin/diagnose.sh` pasan su salida por `redact()`
+Por eso `bin/vps-errors.sh` y `bin/vps-diagnose.sh` pasan su salida por `redact()`
 (`bin/lib/redact.sh`), que tacha IPs, mails, JWTs, tokens (`Bearer`, GitHub, AWS,
 Stripe), claves privadas, pares `password=`/`secret=`/`api_key=` y credenciales
 embebidas en URLs de conexión. Esa salida se puede pegar en un chat o un ticket.

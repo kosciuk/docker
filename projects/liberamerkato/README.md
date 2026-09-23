@@ -145,7 +145,7 @@ sudo systemctl status docker-liberamerkato-outbox.service
 journalctl -u docker-liberamerkato-outbox.service -f
 ```
 
-También lo cubre `bin/diagnose.sh`, sección "Workers long-running".
+También lo cubre `bin/vps-diagnose.sh`, sección "Workers long-running".
 
 ---
 

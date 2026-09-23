@@ -78,21 +78,16 @@ source "${DOCKER}/bin/lib/engine.sh"
 ```
 
 Las variables que acepta la config están documentadas en la cabecera de
-`lib/engine.sh`. Las más usadas:
-
-| Variable | Para qué |
-|---|---|
-| `DATA_DIRS` | directorios a crear bajo `ROOT` |
-| `WRITABLE_DIRS` | los que `www-data` debe poder escribir (uploads) |
-| `SERVICES` | servicios del compose a levantar (vacío = todos) |
-| `REPOS` | `"ruta\|url"` de lo que tiene que estar clonado (se clona si falta) |
-| `DB_SOURCE` | `env` (default), `config` (lee `config.php`) o `none` |
-| `NEEDS_MYSQL` / `NEEDS_GATEWAY` | `0` si no depende de ese servicio |
-| `USES_COMPOSER` | `1` si corre `composer install` + migraciones en el contenedor |
-| `MIGRATE_CONTAINER` | dónde correrlos (default: el primero de `CONTAINERS`) |
-| `SYSTEMD_UNITS` | units que deberían estar activas |
-| `REQUIRED_FILES` | `"ruta\|explicación"` de archivos sin los que no arranca |
-| `KEYPAIR_DIR` | directorio con `private.key`/`public.key` a verificar |
+`lib/engine.sh`. Las más usadas: `DATA_DIRS` (directorios a crear bajo
+`ROOT`), `WRITABLE_DIRS` (los que `www-data` debe poder escribir),
+`SERVICES` (servicios del compose a levantar, vacío = todos), `REPOS`
+(`"ruta|url"` de lo que tiene que estar clonado, se clona si falta),
+`DB_SOURCE` (`env`, `config` o `none`), `NEEDS_MYSQL`/`NEEDS_GATEWAY` (`0`
+si no depende de ese servicio), `USES_COMPOSER` (`1` si corre `composer
+install` + migraciones en el contenedor), `MIGRATE_CONTAINER` (dónde
+correrlos, default el primero de `CONTAINERS`), `SYSTEMD_UNITS`,
+`REQUIRED_FILES` (`"ruta|explicación"` de archivos sin los que no arranca)
+y `KEYPAIR_DIR`.
 
 Para chequeos que no entran en ese molde, la config puede definir dos funciones:
 `check_extra` (fase 1, sólo lectura) y `converge_extra` (fase 2, al final).
@@ -105,9 +100,9 @@ memoria), Docker (contenedores, reinicios, redes), y por proyecto el env, el
 código desplegado, los directorios, la base de datos y el DNS.
 
 ```bash
-./bin/diagnose.sh              # todos los proyectos
-./bin/diagnose.sh enforos      # sólo uno
-./bin/diagnose.sh --help       # qué proyectos hay
+./bin/vps-diagnose.sh              # todos los proyectos
+./bin/vps-diagnose.sh enforos      # sólo uno
+./bin/vps-diagnose.sh --help       # qué proyectos hay
 ```
 
 Los nombres salen de `bin/projects/*.conf` y no siempre coinciden con el
@@ -134,8 +129,8 @@ proyectos lo que más crece, y por lejos, es el **build cache de Docker**: cada
 build deja capas intermedias que nadie borra.
 
 ```bash
-./bin/cleanup.sh              # simulación: dice qué liberaría, sin tocar nada
-./bin/cleanup.sh --apply      # ejecuta
+./bin/vps-cleanup.sh              # simulación: dice qué liberaría, sin tocar nada
+./bin/vps-cleanup.sh --apply      # ejecuta
 ```
 
 Limpia build cache, journal de systemd (lo deja en 200 MB), capas dangling y
@@ -154,10 +149,10 @@ contenedor en `/etc/docker/daemon.json`.
 
 ## Otros scripts
 
-| Script | Qué hace |
-|---|---|
-| `check-linkedcode-auth.sh` | chequeo profundo de auth con el stack ya arriba |
-| `fix-linkedcode-auth.sh` | arregla los problemas más comunes que detecta el anterior |
-| `restart-<proyecto>.sh` | `systemctl restart docker-<proyecto>.service` |
-| `reload-<proyecto>.sh` | recarga sin reiniciar |
-| `status-<proyecto>.sh` | estado de la unit |
+`check-<proyecto>.sh` es el chequeo profundo de un proyecto puntual, con el
+stack ya arriba — sólo existe para los proyectos que lo necesitan (hoy,
+`check-linkedcode-auth.sh`).
+
+Los que no son de un proyecto sino del VPS en general llevan el prefijo
+`vps-`: `vps-diagnose.sh`, `vps-errors.sh`, `vps-cleanup.sh` y
+`vps-check-gateway.sh`, cubiertos arriba.

@@ -3,10 +3,10 @@
 # Radiografía del VPS: junta en una sola corrida el estado de todo lo que
 # suele hacer falta para diagnosticar un problema.
 #
-#   ./bin/diagnose.sh              # todos los proyectos
-#   ./bin/diagnose.sh enforos      # sólo uno
-#   ./bin/diagnose.sh -q           # sólo lo que no es [ ok ]
-#   ./bin/diagnose.sh -q enforos   # combinables, en cualquier orden
+#   ./bin/vps-diagnose.sh              # todos los proyectos
+#   ./bin/vps-diagnose.sh enforos      # sólo uno
+#   ./bin/vps-diagnose.sh -q           # sólo lo que no es [ ok ]
+#   ./bin/vps-diagnose.sh -q enforos   # combinables, en cualquier orden
 #
 # SÓLO LEE. No crea, no modifica, no levanta ni reinicia nada: se puede correr
 # en producción con el sitio andando.

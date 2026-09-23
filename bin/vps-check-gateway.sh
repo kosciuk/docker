@@ -2,8 +2,8 @@
 #
 # Detecta un shared-gateway cuyo proceso quedó desalineado del binario en disco.
 #
-#   ./bin/check-gateway.sh            # sólo diagnostica
-#   ./bin/check-gateway.sh --fix      # reinicia si detecta el desfasaje
+#   ./bin/vps-check-gateway.sh            # sólo diagnostica
+#   ./bin/vps-check-gateway.sh --fix      # reinicia si detecta el desfasaje
 #
 # El síntoma: el gateway sirve 404 en todos los vhosts aunque la config esté
 # bien (vhosts cargados, certificados válidos, backends resolviendo). Se

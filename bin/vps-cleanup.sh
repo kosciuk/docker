@@ -2,8 +2,8 @@
 #
 # Limpieza de disco del VPS: libera lo que Docker y systemd acumulan solos.
 #
-#   ./bin/cleanup.sh              # muestra qué se liberaría, sin tocar nada
-#   ./bin/cleanup.sh --apply      # ejecuta la limpieza
+#   ./bin/vps-cleanup.sh              # muestra qué se liberaría, sin tocar nada
+#   ./bin/vps-cleanup.sh --apply      # ejecuta la limpieza
 #
 # Por defecto corre en seco (dry-run): imprime el tamaño de cada cosa y qué
 # comando la borraría, pero no borra. Hay que pasar --apply explícitamente.
@@ -151,5 +151,5 @@ echo
 if [ "$APPLY" = "1" ]; then
     ok "Listo."
 else
-    info "Simulación terminada. Para ejecutar: ./bin/cleanup.sh --apply"
+    info "Simulación terminada. Para ejecutar: ./bin/vps-cleanup.sh --apply"
 fi
