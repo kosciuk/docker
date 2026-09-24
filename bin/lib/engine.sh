@@ -576,8 +576,19 @@ if [ "${#DATA_DIRS[@]}" -gt 0 ]; then
 
     for dir in "${DATA_DIRS[@]}"; do
         path="${ROOT}/${dir}"
-        if [ -d "$path" ]; then
+        if [ -d "$path" ] && [ -w "$path" ]; then
             ok "$path ya existe"
+        elif [ -d "$path" ] && [[ " ${WRITABLE_DIRS[*]} " == *" $dir "* ]]; then
+            # Los WRITABLE_DIRS son de www-data a propósito; se chequean abajo.
+            ok "$path ya existe"
+        elif [ -d "$path" ]; then
+            # Suele ser Docker, que crea el bind mount como root si no existía:
+            # después el rsync del deploy de la SPA falla con Permission denied.
+            if sudo chown "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$path"; then
+                ok "$path era de root, ahora es de ${SUDO_USER:-$USER}"
+            else
+                fail "$path no es escribible y no se pudo cambiar el dueño"
+            fi
         elif sudo mkdir -p "$path" && sudo chown "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$path"; then
             ok "$path creado"
         else
