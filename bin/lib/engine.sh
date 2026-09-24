@@ -603,8 +603,12 @@ if [ "${#DATA_DIRS[@]}" -gt 0 ]; then
     for dir in "${WRITABLE_DIRS[@]}"; do
         path="${ROOT}/${dir}"
         if [ -d "$path" ] && ! sudo -u www-data test -w "$path" 2>/dev/null; then
-            warn "$path no es escribible por www-data"
-            echo "           sudo chown -R www-data:www-data $path"
+            if sudo chown -R www-data:www-data "$path"; then
+                ok "$path ahora es de www-data"
+            else
+                warn "$path no es escribible por www-data"
+                echo "           sudo chown -R www-data:www-data $path"
+            fi
         fi
     done
 fi
