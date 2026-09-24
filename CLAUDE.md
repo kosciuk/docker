@@ -2,6 +2,9 @@
 
 ## Propósito
 Infraestructura Docker compartida para varios proyectos en un VPS Ubuntu 24.04.
+Usuario del VPS: `ubuntu` (dueño de `/var/www/docker` y de los proyectos bajo
+`/var/www/<proyecto>`; los `bin/*.sh` corren con este usuario, sin sudo salvo
+donde el script lo indica explícitamente).
 Este repositorio **vive en `/var/www/docker`** en el servidor: los `compose.yml`,
 los systemd y los `bin/*.sh` usan esa ruta, y así tiene que quedar escrita en
 todo lo que se versione — aunque en local se esté editando vía `/data/www/docker`.
