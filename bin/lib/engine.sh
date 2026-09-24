@@ -446,6 +446,7 @@ if [ "$USES_COMPOSER" -eq 1 ] && [ -n "$MIGRATE_CONTAINER" ]; then
             [ -z "$COMPOSER_AUTH" ] && exit 2
             token=$(printf %s "$COMPOSER_AUTH" | sed -n "s/.*\"github-oauth\"[^{]*{[^}]*\"github.com\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p")
             [ -z "$token" ] && exit 2
+            command -v curl >/dev/null || exit 3
             code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $token" https://api.github.com/rate_limit)
             [ "$code" = "200" ] && exit 0 || exit 1
         ' 2>/dev/null; echo $?)
@@ -453,7 +454,10 @@ if [ "$USES_COMPOSER" -eq 1 ] && [ -n "$MIGRATE_CONTAINER" ]; then
         case "$auth_check" in
             0) ok "COMPOSER_AUTH válido contra GitHub" ;;
             2) warn "COMPOSER_AUTH no definido o con formato inesperado -- no se pudo probar" ;;
-            *) fail "COMPOSER_AUTH inválido o vencido (GitHub rechazó el token)" ;;
+            3) warn "$MIGRATE_CONTAINER no tiene curl -- no se pudo probar COMPOSER_AUTH" ;;
+            *) fail "COMPOSER_AUTH inválido o vencido (GitHub rechazó el token)"
+               echo "           se prueba el valor del contenedor corriendo, no el de web.env:"
+               echo "           si cambiaste web.env, recrear: docker compose ... up -d --force-recreate" ;;
         esac
     else
         warn "$MIGRATE_CONTAINER no está corriendo todavía -- no se prueba COMPOSER_AUTH"
