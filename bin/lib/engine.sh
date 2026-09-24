@@ -433,35 +433,27 @@ fi
 
 # --------------------------------------------------------------- COMPOSER_AUTH
 
-# Sólo se prueba si el contenedor de composer ya existe y corre: si el stack
-# nunca se levantó no hay nada contra qué probarlo, y no es un fail -- fase 2
-# recién va a correr composer después de levantar.
-if [ "$USES_COMPOSER" -eq 1 ] && [ -n "$MIGRATE_CONTAINER" ]; then
-    if running "$MIGRATE_CONTAINER"; then
-        # COMPOSER_AUTH es el token que composer install usa adentro del
-        # contenedor para bajar paquetes VCS de GitHub. Se prueba contra la
-        # API sin instalar nada: un 401 ahí anticipa que composer install
-        # fallaría.
-        auth_check=$(docker exec "$MIGRATE_CONTAINER" sh -c '
-            [ -z "$COMPOSER_AUTH" ] && exit 2
-            token=$(printf %s "$COMPOSER_AUTH" | sed -n "s/.*\"github-oauth\"[^{]*{[^}]*\"github.com\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p")
-            [ -z "$token" ] && exit 2
-            command -v curl >/dev/null || exit 3
-            code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $token" https://api.github.com/rate_limit)
-            [ "$code" = "200" ] && exit 0 || exit 1
-        ' 2>/dev/null; echo $?)
+# Se prueba el token de ENV_FILE, no el del contenedor corriendo: fase 2
+# recrea el contenedor con ese env, así que es el que composer va a usar. Se
+# prueba contra la API sin instalar nada: un 401 anticipa que composer
+# install fallaría. El token nunca se imprime, sólo el código HTTP.
+if [ "$USES_COMPOSER" -eq 1 ] && [ -f "$ENV_FILE" ]; then
+    token=$(sed -n 's/^COMPOSER_AUTH=//p' "$ENV_FILE" \
+        | sed -n 's/.*"github.com"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 
-        case "$auth_check" in
-            0) ok "COMPOSER_AUTH válido contra GitHub" ;;
-            2) warn "COMPOSER_AUTH no definido o con formato inesperado -- no se pudo probar" ;;
-            3) warn "$MIGRATE_CONTAINER no tiene curl -- no se pudo probar COMPOSER_AUTH" ;;
-            *) fail "COMPOSER_AUTH inválido o vencido (GitHub rechazó el token)"
-               echo "           se prueba el valor del contenedor corriendo, no el de web.env:"
-               echo "           si cambiaste web.env, recrear: docker compose ... up -d --force-recreate" ;;
-        esac
+    if [ -z "$token" ]; then
+        warn "COMPOSER_AUTH no definido o con formato inesperado -- no se pudo probar"
     else
-        warn "$MIGRATE_CONTAINER no está corriendo todavía -- no se prueba COMPOSER_AUTH"
+        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            -H "Authorization: token $token" https://api.github.com/rate_limit)
+        case "$code" in
+            200) ok "COMPOSER_AUTH válido contra GitHub" ;;
+            401) fail "COMPOSER_AUTH inválido o vencido (GitHub respondió 401)" ;;
+            000) warn "no se pudo contactar a GitHub -- COMPOSER_AUTH sin probar" ;;
+            *)   fail "COMPOSER_AUTH: GitHub respondió HTTP $code" ;;
+        esac
     fi
+    unset token code
 fi
 
 # Chequeos propios del proyecto, si los declaró.
