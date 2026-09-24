@@ -269,6 +269,14 @@ if [ "${#REPOS[@]}" -gt 0 ] || [ "${#DIST_DIRS[@]}" -gt 0 ]; then
         url="${entry##*|}"
         if [ -d "${path}/.git" ]; then
             ok "${path} clonado"
+        elif [ -d "$path" ] && [ -n "$(ls -A "$path" 2>/dev/null)" ]; then
+            # git clone no clona sobre un directorio con contenido. Suele
+            # pasar cuando Docker creó el bind mount (como root) antes del
+            # clone, o cuando se copió a mano un config/ antes de clonar.
+            fail "${path} existe con contenido pero no es un repo git"
+            echo "           contiene: $(ls -A "$path" | head -10 | tr '\n' ' ')"
+            echo "           moverlo aparte y volver a correr (se clona limpio):"
+            echo "             sudo mv ${path} ${path}.old"
         else
             warn "falta clonar ${path} (se clona en esta misma corrida)"
             repos_missing+=("$entry")
