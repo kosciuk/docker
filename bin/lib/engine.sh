@@ -517,6 +517,17 @@ if [ "${#repos_missing[@]}" -gt 0 ] || [ "$deploy_root_exists" -eq 1 ]; then
     for entry in "${repos_missing[@]}"; do
         path="${entry%%|*}"
         url="${entry##*|}"
+        # git clone crea sólo el último nivel: el padre tiene que existir y
+        # ser del usuario. Si lo creó Docker o un `sudo mkdir -p`, es de root.
+        parent=$(dirname "$path")
+        if [ ! -w "$parent" ]; then
+            if sudo mkdir -p "$parent" && sudo chown "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$parent"; then
+                ok "$parent ahora es de ${SUDO_USER:-$USER}"
+            else
+                fail "no se pudo dejar $parent escribible"
+                continue
+            fi
+        fi
         if git clone "$url" "$path"; then
             ok "${path} clonado"
             code_changed=1
@@ -552,6 +563,16 @@ fi
 
 if [ "${#DATA_DIRS[@]}" -gt 0 ]; then
     section "Directorios en $ROOT"
+
+    # `sudo mkdir -p` deja como root los niveles intermedios: ROOT tiene que
+    # ser del usuario para que los REPOS se puedan clonar adentro.
+    if [ ! -d "$ROOT" ] || [ ! -w "$ROOT" ]; then
+        if sudo mkdir -p "$ROOT" && sudo chown "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$ROOT"; then
+            ok "$ROOT listo (de ${SUDO_USER:-$USER})"
+        else
+            fail "no se pudo dejar $ROOT escribible"
+        fi
+    fi
 
     for dir in "${DATA_DIRS[@]}"; do
         path="${ROOT}/${dir}"
