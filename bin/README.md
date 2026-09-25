@@ -147,6 +147,23 @@ cosas que el script detecta pero no aplica (las dos son globales del host):
 `SystemMaxUse=200M` en `/etc/systemd/journald.conf`, y la rotación de logs de
 contenedor en `/etc/docker/daemon.json`.
 
+## Charset y collation de las bases
+
+Todas las bases van en `utf8mb4` / `utf8mb4_0900_ai_ci`. `vps-diagnose.sh`
+marca las que no; `vps-fix-collation.sh` las convierte:
+
+```bash
+./bin/vps-fix-collation.sh                    # simulación: base por base, qué tablas cambiaría
+./bin/vps-fix-collation.sh --apply            # convierte todas
+./bin/vps-fix-collation.sh --apply enforos    # sólo un proyecto
+```
+
+Con `--apply`, antes de tocar cada base hace un `mysqldump` comprimido en
+`~/backups/`; si el dump falla, esa base no se toca. Cambia el default de la
+base y hace `ALTER TABLE ... CONVERT` de cada tabla desalineada, con las
+foreign keys desactivadas en la misma sesión. El `CONVERT` reescribe y bloquea
+la tabla mientras dura: correrlo con poco tráfico.
+
 ## Otros scripts
 
 `check-<proyecto>.sh` es el chequeo profundo de un proyecto puntual, con el
@@ -154,5 +171,5 @@ stack ya arriba — sólo existe para los proyectos que lo necesitan (hoy,
 `check-linkedcode-auth.sh`).
 
 Los que no son de un proyecto sino del VPS en general llevan el prefijo
-`vps-`: `vps-diagnose.sh`, `vps-errors.sh`, `vps-cleanup.sh` y
+`vps-`: `vps-diagnose.sh`, `vps-errors.sh`, `vps-cleanup.sh`, `vps-fix-collation.sh` y
 `vps-check-gateway.sh`, cubiertos arriba.

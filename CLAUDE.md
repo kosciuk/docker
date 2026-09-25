@@ -25,7 +25,7 @@ Sí se pueden correr los comandos de este documento. Con dos límites:
 - **Sólo lectura sin avisar.** `docker ps`, `docker logs`, `bin/vps-diagnose.sh`,
   `bin/vps-errors.sh`, `bin/vps-check-gateway.sh` (sin `--fix`) se pueden correr libremente.
 - **Todo lo que modifique se consulta primero**: `up`, `down`, `restart`, `systemctl`,
-  `bin/<proyecto>.sh` y `bin/vps-cleanup.sh --apply`. Son siete proyectos en producción
+  `bin/<proyecto>.sh`, `bin/vps-cleanup.sh --apply` y `bin/vps-fix-collation.sh --apply`. Son siete proyectos en producción
   sobre servicios compartidos: reiniciar `shared-gateway` o `shared-mysql` los afecta
   a todos, y `docker compose down -v` sobre MySQL **borra los datos de todos**.
 
@@ -102,6 +102,8 @@ Los `logs/` de cada proyecto sí se pueden leer, pero salen crudos: usar
 ./bin/vps-check-gateway.sh                       # gateway desalineado (sólo lee)
 ./bin/vps-cleanup.sh                             # liberar disco (simulación)
 ./bin/vps-cleanup.sh --apply                     # liberar disco (ejecuta)
+./bin/vps-fix-collation.sh                       # bases a utf8mb4_0900_ai_ci (simulación)
+./bin/vps-fix-collation.sh --apply [proyecto]    # convierte, con backup previo en ~/backups
 
 docker ps                                    # ver contenedores
 docker logs -f shared-mysql                  # logs MySQL
