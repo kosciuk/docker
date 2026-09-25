@@ -54,7 +54,7 @@
 #   REQUIRED_FILES "ruta|explicación" de archivos que deben existir (vacío)
 #   DB_SOURCE     de dónde salen las credenciales: env | config | none  (env)
 #   DB_NAME       nombre de la base                  ($PROJECT)
-#   APP_CONFIG    config.php a leer si DB_SOURCE=config
+#   APP_CONFIG    config.<env>.php a leer si DB_SOURCE=config
 #   KEYPAIR_DIR   directorio con private.key/public.key a verificar
 #   SERVICES      servicios del compose a levantar y verificar (todos)
 #   CONTAINERS    contenedores a verificar           ($PROJECT-$svc por servicio)
@@ -393,26 +393,35 @@ if [ "$DB_SOURCE" != "none" ]; then
                 db_origin="del env"
             fi ;;
         config)
-            # Estos proyectos NO arman la conexión con las variables DB_* del
-            # compose: config/common.php fija localhost y eso se pisa desde
-            # config/config.php, que no se versiona.
+            # Con notenv la conexión sale de config/config.<env>.php (no
+            # versionado), no del env del compose: se le pregunta a PHP por el
+            # valor efectivo en vez de grepear. El VPS no tiene PHP en el host,
+            # así que se usa el del contenedor de la API si ya corre; el archivo
+            # entra por stdin, sin depender de cómo esté montado.
+            read_db_php='
+                $code = stream_get_contents(STDIN);
+                $code = preg_replace("/^<\?php\s*/", "", $code);
+                $code = preg_replace("/declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;/", "", $code, 1);
+                $c  = eval($code);
+                $db = is_array($c) ? ($c["db"] ?? []) : [];
+                printf("%s\n%s\n%s\n", $db["dbname"] ?? "", $db["user"] ?? "", $db["password"] ?? "");
+            '
+            creds=""
             if [ ! -f "$APP_CONFIG" ]; then
-                db_skip="sin config.php no se puede verificar la base"
-            elif ! command -v php >/dev/null 2>&1; then
-                # El VPS puede no tener PHP en el host: todo corre en contenedores.
-                db_skip="no hay php en el host para leer config.php"
+                db_skip="sin $(basename "$APP_CONFIG") no se puede verificar la base"
+            elif command -v php >/dev/null 2>&1; then
+                creds=$(php -r "$read_db_php" <"$APP_CONFIG" 2>/dev/null)
+            elif [ -n "$MIGRATE_CONTAINER" ] && running "$MIGRATE_CONTAINER"; then
+                creds=$(docker exec -i "$MIGRATE_CONTAINER" php -r "$read_db_php" <"$APP_CONFIG" 2>/dev/null)
             else
-                # Se le pregunta a PHP por el valor efectivo en vez de grepear.
-                creds=$(php -r '
-                    $c = require $argv[1];
-                    $db = $c["db"] ?? [];
-                    printf("%s\n%s\n%s\n", $db["dbname"] ?? "", $db["user"] ?? "", $db["password"] ?? "");
-                ' "$APP_CONFIG" 2>/dev/null)
+                db_skip="sin php en el host y ${MIGRATE_CONTAINER:-la API} sin correr: no se lee $(basename "$APP_CONFIG")"
+            fi
+            if [ -z "$db_skip" ]; then
                 db_name=$(printf '%s\n' "$creds" | sed -n 1p)
                 db_user=$(printf '%s\n' "$creds" | sed -n 2p)
                 db_pass=$(printf '%s\n' "$creds" | sed -n 3p)
                 db_name=${db_name:-$DB_NAME}
-                db_origin="de config.php"
+                db_origin="de $(basename "$APP_CONFIG")"
             fi ;;
     esac
 

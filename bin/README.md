@@ -63,9 +63,18 @@ PROJECT="miproyecto"
 DATA_DIRS=(app img www logs)
 WRITABLE_DIRS=(img)
 SERVICES=(api app img www)
-REPOS=("/var/www/miproyecto/api|git@github.com:miproyecto/api.git")
-PLACEHOLDERS='^(DB_PASS|COMPOSER_AUTH)=[[:space:]]*$|CAMBIAR'
+REPOS=("/var/www/miproyecto/api|git@github-linkedcode:miproyecto/api.git")
+USES_COMPOSER=1
+DB_SOURCE="config"
+APP_CONFIG="/var/www/miproyecto/api/config/config.prod.php"
+REQUIRED_FILES=("/var/www/miproyecto/api/config/config.prod.php|crearlo a mano")
+PLACEHOLDERS='^COMPOSER_AUTH=[[:space:]]*$|GITHUB_PAT_AQUI|CAMBIAR'
 ```
+
+Las APIs usan notenv: toda la configuración de la app, secretos incluidos, va
+en `api/config/config.prod.php` (no versionado), igual que en desarrollo va en
+`config.dev.php`. El `web.env` del compose sólo lleva lo del contenedor:
+`APP_ENV`, `TZ` y `COMPOSER_AUTH`. Nunca repartir una misma clave entre los dos.
 
 Y el wrapper `bin/miproyecto.sh`:
 
