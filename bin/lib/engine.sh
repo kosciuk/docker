@@ -334,6 +334,17 @@ fi
 
 # ------------------------------------------------------- archivos requeridos
 
+# REQUIRED_FILES que viven adentro de un repo que falta clonar.
+declare -a files_deferred=()
+
+in_missing_repo() {
+    local entry
+    for entry in "${repos_missing[@]}"; do
+        [[ "$1" == "${entry%%|*}/"* ]] && return 0
+    done
+    return 1
+}
+
 if [ "${#REQUIRED_FILES[@]}" -gt 0 ]; then
     section "Archivos de configuración"
 
@@ -342,6 +353,13 @@ if [ "${#REQUIRED_FILES[@]}" -gt 0 ]; then
         hint="${entry##*|}"
         if [ -f "$path" ]; then
             ok "$(basename "$path") presente"
+        elif in_missing_repo "$path"; then
+            # En el primer deploy el repo todavía no existe: lo versionado
+            # llega con el clone, y lo no versionado no se puede crear antes
+            # (git clone no clona sobre un directorio con contenido). Se
+            # vuelve a mirar en fase 2, después de clonar.
+            echo "  [  --  ] $(basename "$path"): su repo se clona en esta corrida, se chequea después"
+            files_deferred+=("$entry")
         else
             fail "falta ${path}"
             echo "           ${hint}"
@@ -563,10 +581,26 @@ if [ "${#repos_missing[@]}" -gt 0 ] || [ "$deploy_root_exists" -eq 1 ]; then
     fi
 fi
 
+if [ "$fails" -eq 0 ] && [ "${#files_deferred[@]}" -gt 0 ]; then
+    section "Archivos de configuración"
+
+    for entry in "${files_deferred[@]}"; do
+        path="${entry%%|*}"
+        hint="${entry##*|}"
+        if [ -f "$path" ]; then
+            ok "$(basename "$path") presente"
+        else
+            fail "falta ${path}"
+            echo "           ${hint}"
+        fi
+    done
+fi
+
 if [ "$fails" -gt 0 ]; then
     echo
     echo "==> Corto acá"
     echo "  $fails falla(s) clonando/actualizando código. Reviso antes de seguir."
+    echo "  Lo clonado queda: completá lo que falte y volvé a correr."
     exit 1
 fi
 
