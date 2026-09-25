@@ -396,41 +396,61 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
         fi
 
         # ---- base de datos
-        if [ "$have_docker" -eq 1 ] && running shared-mysql && [ -f "$ENV_FILE" ]; then
+        if [ "$have_docker" -eq 1 ] && running shared-mysql; then
             section "Base de datos"
-            db=$(sed -n 's/^DB_NAME=//p' "$ENV_FILE" | tr -d '"'"'"'')
+            db=""
+            [ -f "$ENV_FILE" ] && db=$(sed -n 's/^DB_NAME=//p' "$ENV_FILE" | tr -d '"'"'"'')
             db=${db:-${DB_NAME:-$PROJECT}}
-            u=$(sed -n 's/^DB_USER=//p' "$ENV_FILE" | tr -d '"'"'"'')
-            p=$(sed -n 's/^DB_PASS=//p' "$ENV_FILE" | tr -d '"'"'"'')
-            if [ -z "$u" ] || [ -z "$p" ]; then
-                hmm "sin credenciales en el env - no se verifica"
-            elif docker exec shared-mysql mysql -u "$u" -p"$p" -e "USE \`$db\`" >/dev/null 2>&1; then
-                n=$(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
-                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db'" 2>/dev/null)
-                ok "'$db' accesible — ${n:-?} tabla(s)"
 
-                # Todo tiene que ser utf8mb4 / utf8mb4_0900_ai_ci. El default
-                # de la base sólo aplica a tablas nuevas: una tabla creada
-                # antes (o importada de un dump viejo) conserva su collation, y
-                # un JOIN entre collations distintas falla con "Illegal mix of
-                # collations" recién en runtime.
-                want_cs=utf8mb4 want_co=utf8mb4_0900_ai_ci
-                read -r cs co < <(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
-                    "SELECT default_character_set_name, default_collation_name
-                       FROM information_schema.schemata WHERE schema_name='$db'" 2>/dev/null)
+            # Acceso con las credenciales de la app: sólo si están en el env.
+            # Con notenv viven en config.<env>.php y no se prueban acá.
+            u="" p=""
+            if [ -f "$ENV_FILE" ]; then
+                u=$(sed -n 's/^DB_USER=//p' "$ENV_FILE" | tr -d '"'"'"'')
+                p=$(sed -n 's/^DB_PASS=//p' "$ENV_FILE" | tr -d '"'"'"'')
+            fi
+            if [ -n "$u" ] && [ -n "$p" ]; then
+                if docker exec shared-mysql mysql -u "$u" -p"$p" -e "USE \`$db\`" >/dev/null 2>&1; then
+                    ok "'$db' accesible con las credenciales del env"
+                else
+                    bad "no se pudo entrar a '$db' con las credenciales del env"
+                fi
+            fi
+
+            # El resto son lecturas de information_schema como root, con la
+            # clave que el contenedor ya tiene en su entorno: anda para todos
+            # los proyectos, tengan o no credenciales en el env, y la clave no
+            # sale nunca del contenedor.
+            q() {
+                docker exec -i shared-mysql sh -c \
+                    'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B 2>/dev/null' <<<"$1"
+            }
+
+            # Todo tiene que ser utf8mb4 / utf8mb4_0900_ai_ci. El default de la
+            # base sólo aplica a tablas nuevas: una tabla creada antes (o
+            # importada de un dump viejo) conserva su collation, y un JOIN
+            # entre collations distintas falla con "Illegal mix of collations"
+            # recién en runtime.
+            want_cs=utf8mb4 want_co=utf8mb4_0900_ai_ci
+            read -r cs co < <(q "SELECT default_character_set_name, default_collation_name
+                                   FROM information_schema.schemata WHERE schema_name='$db'")
+            if [ -z "$cs" ]; then
+                bad "la base '$db' no existe (o no se pudo consultar como root)"
+            else
+                n=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db'")
+                ok "'$db' existe — ${n:-?} tabla(s)"
+
                 if [ "$cs" = "$want_cs" ] && [ "$co" = "$want_co" ]; then
                     ok "base en $cs / $co"
                 else
-                    bad "base en ${cs:-?} / ${co:-?} (debería ser $want_cs / $want_co)"
+                    bad "base en $cs / $co (debería ser $want_cs / $want_co)"
                     info "  ALTER DATABASE \`$db\` CHARACTER SET $want_cs COLLATE $want_co;"
                 fi
 
-                # Tablas y columnas de texto con otra collation, agrupadas.
-                off=$(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
-                    "SELECT table_collation, COUNT(*) FROM information_schema.tables
-                      WHERE table_schema='$db' AND table_type='BASE TABLE'
-                        AND table_collation <> '$want_co'
-                      GROUP BY table_collation" 2>/dev/null)
+                off=$(q "SELECT table_collation, COUNT(*) FROM information_schema.tables
+                          WHERE table_schema='$db' AND table_type='BASE TABLE'
+                            AND table_collation <> '$want_co'
+                          GROUP BY table_collation")
                 if [ -z "$off" ]; then
                     ok "tablas en $want_co"
                 else
@@ -439,13 +459,11 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
                     done
                     info "  por tabla: ALTER TABLE <t> CONVERT TO CHARACTER SET $want_cs COLLATE $want_co;"
                 fi
-                ncol=$(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
-                    "SELECT COUNT(*) FROM information_schema.columns
-                      WHERE table_schema='$db' AND collation_name IS NOT NULL
-                        AND collation_name <> '$want_co'" 2>/dev/null)
+
+                ncol=$(q "SELECT COUNT(*) FROM information_schema.columns
+                           WHERE table_schema='$db' AND collation_name IS NOT NULL
+                             AND collation_name <> '$want_co'")
                 [ "${ncol:-0}" -gt 0 ] && hmm "$ncol columna(s) con otra collation (el CONVERT de la tabla las arregla)"
-            else
-                bad "no se pudo entrar a '$db' con las credenciales del env"
             fi
         fi
 
