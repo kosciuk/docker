@@ -366,7 +366,7 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
                     ok "$p — $n entrada(s), $sz"
                 fi
             done
-            for d in ${WRITABLE_DIRS:-}; do
+            for d in "${WRITABLE_DIRS[@]}"; do
                 p="${ROOT}/${d}"
                 [ -d "$p" ] || continue
                 # La API corre como www-data: si no puede escribir, los uploads

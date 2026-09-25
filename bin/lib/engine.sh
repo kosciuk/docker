@@ -605,7 +605,7 @@ if [ "${#DATA_DIRS[@]}" -gt 0 ]; then
         fi
     done
 
-    # La API escribe los uploads que sirve el contenedor img, y corre como
+    # La API escribe los uploads que sirve el contenedor img y su app.log, y corre como
     # www-data adentro del contenedor. Si el directorio quedó como root (típico
     # de un mkdir a mano), los uploads fallan con Permission denied recién al
     # subir la primera imagen, no al levantar.
