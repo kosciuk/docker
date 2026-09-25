@@ -233,16 +233,20 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
             v=$(sed -n "s/^APP_ENV=//p" "$ENV_FILE" | tr -d '"'"'"'')
             [ -n "$v" ] && ok "APP_ENV = $v" || bad "APP_ENV sin definir"
 
-            # Las DB_* son opcionales: con notenv migrado viven en
-            # config.<env>.php. Se muestran si están, sin reclamarlas.
+            # COMPOSER_AUTH también es del contenedor (composer install).
+            v=$(sed -n "s/^COMPOSER_AUTH=//p" "$ENV_FILE" | tr -d '"'"'"'')
+            [ -n "$v" ] && describe_secret "COMPOSER_AUTH" "$v"
+
+            # Con notenv, DB_*, JWT_* y SMTP_* van en config.<env>.php: en el
+            # env nadie los lee. Si quedaron, se marcan (sin mostrar secretos).
             for var in DB_HOST DB_NAME DB_USER; do
                 v=$(sed -n "s/^${var}=//p" "$ENV_FILE" | tr -d '"'"'"'')
-                [ -n "$v" ] && ok "$var = $v"
+                [ -n "$v" ] && hmm "$var = $v  (va en config.<env>.php)"
             done
-            for var in DB_PASS JWT_SECRET SMTP_PASS_KEY COMPOSER_AUTH; do
+            for var in DB_PASS JWT_SECRET SMTP_PASS_KEY; do
                 if grep -q "^${var}=" "$ENV_FILE" 2>/dev/null; then
                     v=$(sed -n "s/^${var}=//p" "$ENV_FILE" | tr -d '"'"'"'')
-                    describe_secret "$var" "$v"
+                    hmm "$var: definido (${#v} chars)  (va en config.<env>.php)"
                 fi
             done
         fi
