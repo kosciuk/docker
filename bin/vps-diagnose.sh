@@ -371,9 +371,19 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
                 [ -d "$p" ] || continue
                 # La API corre como www-data: si no puede escribir, los uploads
                 # fallan recién al subir la primera imagen.
-                sudo -n -u www-data test -w "$p" 2>/dev/null \
-                    && ok "$p escribible por www-data" \
-                    || hmm "$p: no se pudo confirmar escritura de www-data"
+                # Se mira dueño y modo en vez de probar con sudo, que sin
+                # contraseña falla y no dice nada. www-data es uid/gid 33 tanto
+                # en el host Ubuntu como en la imagen php-apache.
+                read -r uid gid mode own < <(stat -c '%u %g %a %U:%G' "$p")
+                mode=$(printf '%03d' "$mode"); mode=${mode: -3}
+                if { [ "$uid" = 33 ] && (( ${mode:0:1} & 2 )); } \
+                   || { [ "$gid" = 33 ] && (( ${mode:1:1} & 2 )); } \
+                   || (( ${mode:2:1} & 2 )); then
+                    ok "$p escribible por www-data ($own $mode)"
+                else
+                    bad "$p: www-data no puede escribir ($own $mode)"
+                    info "  sudo chown -R www-data:www-data $p"
+                fi
             done
         fi
 
