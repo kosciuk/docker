@@ -408,6 +408,42 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
                 n=$(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
                     "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db'" 2>/dev/null)
                 ok "'$db' accesible — ${n:-?} tabla(s)"
+
+                # Todo tiene que ser utf8mb4 / utf8mb4_0900_ai_ci. El default
+                # de la base sólo aplica a tablas nuevas: una tabla creada
+                # antes (o importada de un dump viejo) conserva su collation, y
+                # un JOIN entre collations distintas falla con "Illegal mix of
+                # collations" recién en runtime.
+                want_cs=utf8mb4 want_co=utf8mb4_0900_ai_ci
+                read -r cs co < <(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
+                    "SELECT default_character_set_name, default_collation_name
+                       FROM information_schema.schemata WHERE schema_name='$db'" 2>/dev/null)
+                if [ "$cs" = "$want_cs" ] && [ "$co" = "$want_co" ]; then
+                    ok "base en $cs / $co"
+                else
+                    bad "base en ${cs:-?} / ${co:-?} (debería ser $want_cs / $want_co)"
+                    info "  ALTER DATABASE \`$db\` CHARACTER SET $want_cs COLLATE $want_co;"
+                fi
+
+                # Tablas y columnas de texto con otra collation, agrupadas.
+                off=$(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
+                    "SELECT table_collation, COUNT(*) FROM information_schema.tables
+                      WHERE table_schema='$db' AND table_type='BASE TABLE'
+                        AND table_collation <> '$want_co'
+                      GROUP BY table_collation" 2>/dev/null)
+                if [ -z "$off" ]; then
+                    ok "tablas en $want_co"
+                else
+                    printf '%s\n' "$off" | while IFS=$'\t' read -r tco tn; do
+                        bad "$tn tabla(s) en $tco"
+                    done
+                    info "  por tabla: ALTER TABLE <t> CONVERT TO CHARACTER SET $want_cs COLLATE $want_co;"
+                fi
+                ncol=$(docker exec shared-mysql mysql -u "$u" -p"$p" -N -B -e \
+                    "SELECT COUNT(*) FROM information_schema.columns
+                      WHERE table_schema='$db' AND collation_name IS NOT NULL
+                        AND collation_name <> '$want_co'" 2>/dev/null)
+                [ "${ncol:-0}" -gt 0 ] && hmm "$ncol columna(s) con otra collation (el CONVERT de la tabla las arregla)"
             else
                 bad "no se pudo entrar a '$db' con las credenciales del env"
             fi
