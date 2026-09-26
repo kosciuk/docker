@@ -425,12 +425,13 @@ if [ "$DB_SOURCE" != "none" ]; then
                 printf("%s\n%s\n%s\n", $db["dbname"] ?? "", $db["user"] ?? "", $db["password"] ?? "");
             '
             creds=""
+            php_err_file=$(mktemp)
             if [ ! -f "$APP_CONFIG" ]; then
                 db_skip="sin $(basename "$APP_CONFIG") no se puede verificar la base"
             elif command -v php >/dev/null 2>&1; then
-                creds=$(php -r "$read_db_php" <"$APP_CONFIG" 2>/dev/null)
+                creds=$(php -r "$read_db_php" <"$APP_CONFIG" 2>"$php_err_file")
             elif [ -n "$MIGRATE_CONTAINER" ] && running "$MIGRATE_CONTAINER"; then
-                creds=$(docker exec -i "$MIGRATE_CONTAINER" php -r "$read_db_php" <"$APP_CONFIG" 2>/dev/null)
+                creds=$(docker exec -i "$MIGRATE_CONTAINER" php -r "$read_db_php" <"$APP_CONFIG" 2>"$php_err_file")
             else
                 db_skip="sin php en el host y ${MIGRATE_CONTAINER:-la API} sin correr: no se lee $(basename "$APP_CONFIG")"
             fi
@@ -440,7 +441,14 @@ if [ "$DB_SOURCE" != "none" ]; then
                 db_pass=$(printf '%s\n' "$creds" | sed -n 3p)
                 db_name=${db_name:-$DB_NAME}
                 db_origin="de $(basename "$APP_CONFIG")"
-            fi ;;
+            fi
+            # Qué dijo PHP al evaluar el archivo: un parse error o una excepción
+            # (una clase sin autoload, un require relativo) dejan todo vacío y,
+            # sin esto, el síntoma es sólo "no hay usuario/contraseña". Se
+            # muestra sólo el mensaje, sin el código fuente.
+            php_err=$(grep -v '^Xdebug' "$php_err_file" 2>/dev/null | grep -m1 -iE 'error|warning|exception' \
+                | sed -E 's/^PHP //; s/ in (Command line code|.*eval\(\)).*$//')
+            rm -f "$php_err_file" ;;
     esac
 
     if [ -n "$db_skip" ]; then
@@ -449,6 +457,9 @@ if [ "$DB_SOURCE" != "none" ]; then
         warn "shared-mysql no está corriendo - salteado"
     elif [ -z "$db_user" ] || [ -z "$db_pass" ]; then
         fail "no hay usuario/contraseña de base ${db_origin}"
+        [ -z "$db_user" ] && echo "           falta o está vacío db.user"
+        [ -z "$db_pass" ] && echo "           falta o está vacío db.password"
+        [ -n "${php_err:-}" ] && echo "           PHP al evaluarlo: ${php_err}"
     elif docker exec shared-mysql mysql -u "$db_user" -p"$db_pass" \
              -e "USE \`${db_name}\`" >/dev/null 2>&1; then
         ok "base '${db_name}' accesible con las credenciales ${db_origin}"
