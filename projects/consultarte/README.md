@@ -41,6 +41,41 @@ Editar `env/web.env` con las credenciales reales (`DB_USER`/`DB_PASS`, `COMPOSER
 
 ---
 
+## Claves de la urna
+
+La API firma las boletas con firmas ciegas RSA. El par vive en
+`api/config/ballot-private.key` y `ballot-public.key`, que no se versionan.
+`bin/consultarte.sh` corta si faltan.
+
+- **Se generan en el VPS, no se copian las de dev.** Con la privada se pueden
+  firmar boletas válidas, así que no puede andar dando vueltas por notebooks.
+- **Se generan con openssl en el host**, no con `bin/generate-ballot-keys.php`:
+  ese script necesita el contenedor levantado, y el deploy no lo levanta si
+  faltan las claves.
+- **La privada la lee `www-data` (el php-fpm del contenedor) y nadie más:**
+  `ubuntu:www-data` con modo `640`. Con `600` de ubuntu la API no la puede
+  leer; con `644` la ve cualquier usuario del VPS.
+- **Hay que hacer un backup fuera del VPS** (cifrado, en un gestor de contraseñas).
+  Si se pierde con una encuesta abierta, quien pidió la firma y no votó
+  ya no puede votar: su boleta figura como emitida y no puede pedir otra.
+- **No hay que rotarla con una encuesta abierta**, por lo mismo. Sólo entre encuestas.
+
+```bash
+cd /var/www/consultarte/api/config
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out ballot-private.key
+openssl pkey -in ballot-private.key -pubout -out ballot-public.key
+sudo chown ubuntu:www-data ballot-private.key && chmod 640 ballot-private.key
+chmod 644 ballot-public.key
+```
+
+Con el stack arriba, comprobar que la API la lee:
+
+```bash
+curl -s https://api.consultarte.com.ar/crypto/public-key   # devuelve n y e
+```
+
+---
+
 ## Levantar el proyecto
 
 ### Camino corto
