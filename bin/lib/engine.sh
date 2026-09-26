@@ -174,7 +174,9 @@ warn() { echo "  [ ojo ]  $1"; warns=$((warns + 1)); }
 section() { echo; echo "==> $1"; }
 
 # Un solo docker inspect por consulta, detrás de un nombre legible.
-running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = "true" ]; }
+# Status y no Running: un contenedor en loop de reinicios tiene Running=true,
+# pero docker exec lo rechaza ("is restarting").
+running() { [ "$(docker inspect -f '{{.State.Status}}' "$1" 2>/dev/null)" = "running" ]; }
 
 dc() { docker exec -w /var/www/html "$MIGRATE_CONTAINER" "$@"; }
 
@@ -432,6 +434,8 @@ if [ "$DB_SOURCE" != "none" ]; then
                 creds=$(php -r "$read_db_php" <"$APP_CONFIG" 2>"$php_err_file")
             elif [ -n "$MIGRATE_CONTAINER" ] && running "$MIGRATE_CONTAINER"; then
                 creds=$(docker exec -i "$MIGRATE_CONTAINER" php -r "$read_db_php" <"$APP_CONFIG" 2>"$php_err_file")
+            elif [ -n "$MIGRATE_CONTAINER" ] && [ "$(docker inspect -f '{{.State.Status}}' "$MIGRATE_CONTAINER" 2>/dev/null)" = "restarting" ]; then
+                db_skip="$MIGRATE_CONTAINER está en loop de reinicios (docker logs --tail 50 $MIGRATE_CONTAINER): no se lee $(basename "$APP_CONFIG")"
             else
                 db_skip="sin php en el host y ${MIGRATE_CONTAINER:-la API} sin correr: no se lee $(basename "$APP_CONFIG")"
             fi

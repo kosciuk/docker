@@ -90,7 +90,9 @@ info() { echo "           $1"; }
 section() { echo; echo "==> $1"; }
 title()   { echo; echo "############ $1"; }
 
-running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = "true" ]; }
+# Status y no Running: un contenedor en loop de reinicios tiene Running=true,
+# pero docker exec lo rechaza ("is restarting").
+running() { [ "$(docker inspect -f '{{.State.Status}}' "$1" 2>/dev/null)" = "running" ]; }
 
 have_docker=0
 docker info >/dev/null 2>&1 && have_docker=1
