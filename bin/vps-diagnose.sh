@@ -295,6 +295,13 @@ for conf in "$DOCKER"/bin/projects/*.conf; do
                 *)                  app_env="" ;;
             esac
 
+            # notenv acepta 'production', pero los dependencies.php comparan
+            # $_ENV['APP_ENV'] crudo contra 'prod': con 'production' el logger
+            # queda en Debug. El valor del stack es 'prod'.
+            if [ "$raw_env" = "production" ]; then
+                hmm "APP_ENV=production en $(basename "$ENV_FILE"): pasar a APP_ENV=prod (con 'production' el log queda en Debug)"
+            fi
+
             if [ -z "$app_env" ]; then
                 bad "APP_ENV='${raw_env}' no es dev|test|prod -- notenv lanza excepción al arrancar"
             else

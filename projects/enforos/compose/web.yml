@@ -13,7 +13,7 @@ services:
       # APP_ENV es lo único que la app lee de acá, y sólo para elegir ese
       # archivo. COMPOSER_AUTH es de build: el entrypoint corre
       # `composer install` y los linkedcode/* son repos privados.
-      APP_ENV: ${APP_ENV:-production}
+      APP_ENV: ${APP_ENV:-prod}
       COMPOSER_AUTH: ${COMPOSER_AUTH}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:

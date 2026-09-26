@@ -725,7 +725,7 @@ fi
 if [ "$USES_COMPOSER" -eq 1 ] && [ -n "$MIGRATE_CONTAINER" ]; then
     section "composer install"
 
-    # --no-dev: mismo criterio que el resto del stack, que corre en production.
+    # --no-dev: mismo criterio que el resto del stack, que corre en prod.
     if ! dc composer install --no-dev -o --no-interaction; then
         fail "composer install falló en $MIGRATE_CONTAINER"
         exit 1
