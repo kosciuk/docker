@@ -20,6 +20,7 @@ services:
       - /var/www/cooperativismoabierto/logs:/var/www/cooperativismoabierto/logs
       - /var/www/impuestounico/logs:/var/www/impuestounico/logs
       - /var/www/perdidosyencontrados/logs:/var/www/perdidosyencontrados/logs
+      - /var/www/consultarte/logs:/var/www/consultarte/logs
       - /var/www/granhermano/logs:/var/www/granhermano/logs
       - /var/www/zurdosanonimos/logs:/var/www/zurdosanonimos/logs
       - /var/www/kosciuk/logs:/var/www/kosciuk/logs

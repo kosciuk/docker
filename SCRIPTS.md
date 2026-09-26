@@ -11,7 +11,7 @@ Se corren en el VPS, en `/var/www/docker`.
 - **`projects/<x>.conf`** — la config de cada proyecto (lo lee
   `<proyecto>.sh`).
 
-Proyectos con este esquema: cooperativismoabierto, ember, enforos,
+Proyectos con este esquema: consultarte, cooperativismoabierto, ember, enforos,
 granhermano, impuestounico, liberamerkato, linkedcode-auth, linkedcode-www,
 perdidosyencontrados, zurdosanonimos. Todos migrados — no queda ninguno con
 el patrón viejo (`setup-*`/`deploy-*`/`reload-*`/`restart-*`/`status-*`).

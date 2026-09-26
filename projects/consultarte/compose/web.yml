@@ -1,0 +1,73 @@
+name: consultarte
+
+services:
+  api:
+    build:
+      context: /var/www/docker
+      dockerfile: images/php84-fpm/Dockerfile
+    container_name: consultarte-api
+    restart: unless-stopped
+    environment:
+      # La configuración de la app no viene por entorno: vive en
+      # api/config/config.prod.php, que está en el VPS y no se versiona.
+      # APP_ENV es lo único que la app lee de acá, y sólo para elegir ese
+      # archivo. COMPOSER_AUTH es de build: el entrypoint corre
+      # `composer install` y los linkedcode/* son repos privados.
+      APP_ENV: ${APP_ENV:-production}
+      COMPOSER_AUTH: ${COMPOSER_AUTH}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - /var/www/consultarte/api:/var/www/html
+      - consultarte_api_cache:/var/www/html/var/cache
+      - consultarte_api_vendor:/var/www/html/vendor
+      - /var/www/consultarte/img:/var/www/consultarte/img
+      - /var/www/consultarte/logs:/var/www/consultarte/logs
+      - /var/www/docker/projects/consultarte/config/uploads.ini:/usr/local/etc/php/conf.d/zz-uploads.ini:ro
+    networks:
+      - shared_services
+      - projects_public
+
+  app:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: consultarte-app
+    restart: unless-stopped
+    volumes:
+      - /var/www/consultarte/app:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  img:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: consultarte-img
+    restart: unless-stopped
+    volumes:
+      - /var/www/consultarte/img:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+  www:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: consultarte-www
+    restart: unless-stopped
+    volumes:
+      - /var/www/consultarte/www:/usr/local/apache2/htdocs
+    networks:
+      - projects_public
+
+volumes:
+  consultarte_api_cache:
+  consultarte_api_vendor:
+
+networks:
+  shared_services:
+    external: true
+    name: shared_services
+  projects_public:
+    external: true
+    name: projects_public
