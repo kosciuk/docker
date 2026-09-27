@@ -334,6 +334,53 @@ if [ -d "$DEPLOY_ROOT/.git" ]; then
     fi
 fi
 
+# ------------------------------------------------------ endpoint userinfo OAuth
+
+# Si la app se loguea contra un proveedor OAuth, su url_userinfo tiene que
+# existir ANTES de desplegarla: si auth.linkedcode todavía no publicó la ruta
+# nueva, el login queda roto. Se mira lo que va a quedar corriendo: el
+# config/common.php de origin (lo que trae el pull) y el config.<env>.php
+# local, que lo pisa. Sin token el endpoint responde 401: eso prueba que la
+# ruta existe; un 404 o un redirect a /login corta el deploy.
+if [ "$deploy_root_exists" -eq 1 ] && [ -n "$remote" ]; then
+    userinfo_src=""
+    if git -C "$DEPLOY_ROOT" fetch -q origin "$DEPLOY_BRANCH" 2>/dev/null; then
+        userinfo_src=$(git -C "$DEPLOY_ROOT" show "origin/${DEPLOY_BRANCH}:config/common.php" 2>/dev/null)
+    fi
+    [ -n "$APP_CONFIG" ] && [ -f "$APP_CONFIG" ] && userinfo_src+=$'\n'"$(cat "$APP_CONFIG")"
+
+    # Sólo las URLs, nunca el resto del archivo (hay secretos al lado).
+    mapfile -t userinfo_urls < <(printf '%s\n' "$userinfo_src" \
+        | grep -v '^[[:space:]]*//' \
+        | sed -nE "s/.*['\"](url_userinfo|urlResourceOwnerDetails)['\"][[:space:]]*=>[[:space:]]*['\"]([^'\"]+)['\"].*/\2/p" \
+        | sort -u)
+    unset userinfo_src
+
+    if [ "${#userinfo_urls[@]}" -gt 0 ]; then
+        section "Endpoint userinfo OAuth"
+        for url in "${userinfo_urls[@]}"; do
+            # Una URL .local es de desarrollo (config.dev o default de
+            # common.php pisado en prod): desde el VPS no resuelve.
+            if [[ "$url" == *.local/* ]]; then
+                echo "  [  --  ] $url: dominio .local, se saltea"
+                continue
+            fi
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+            case "$code" in
+                401|400|403|200) ok "$url responde (HTTP $code)" ;;
+                # auth.linkedcode manda a /login cualquier ruta que no conoce
+                # como pública, así que una ruta inexistente llega como 302.
+                404|301|302|303|307|308)
+                     fail "$url no está disponible (HTTP $code)"
+                     echo "           desplegar primero el proveedor OAuth (bin/linkedcode-auth.sh)" ;;
+                000) warn "no se pudo contactar $url -- sin verificar" ;;
+                *)   warn "$url respondió HTTP $code" ;;
+            esac
+        done
+    fi
+    unset userinfo_urls url code
+fi
+
 # ------------------------------------------------------- archivos requeridos
 
 # REQUIRED_FILES que viven adentro de un repo que falta clonar.
