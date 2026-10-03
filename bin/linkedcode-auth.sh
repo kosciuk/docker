@@ -7,6 +7,8 @@
 #   ./bin/linkedcode-auth.sh              # converge y actualiza (sin rebuild)
 #   ./bin/linkedcode-auth.sh --build      # además reconstruye las imágenes
 #   ./bin/linkedcode-auth.sh --dry-run    # sólo muestra qué cambiaría
+#   ./bin/linkedcode-auth.sh --verify     # además manda el mail de prueba aunque no haya cambios
+#                                 # (sin esto sólo lo manda si hubo código nuevo o --build)
 #
 # La lógica está en bin/lib/engine.sh; lo propio de este proyecto, en
 # bin/projects/linkedcode-auth.conf.

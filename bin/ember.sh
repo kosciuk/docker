@@ -7,6 +7,8 @@
 #   ./bin/ember.sh              # converge y actualiza (sin rebuild)
 #   ./bin/ember.sh --build      # además reconstruye las imágenes
 #   ./bin/ember.sh --dry-run    # sólo muestra qué cambiaría
+#   ./bin/ember.sh --verify     # además manda el mail de prueba aunque no haya cambios
+#                                 # (sin esto sólo lo manda si hubo código nuevo o --build)
 #
 # La lógica está en bin/lib/engine.sh; lo propio de este proyecto, en
 # bin/projects/ember.conf.

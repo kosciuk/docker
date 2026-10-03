@@ -76,6 +76,10 @@
 # Hooks opcionales: si la config define estas funciones, se llaman en su fase.
 #   check_extra     chequeos propios del proyecto (fase 1, sólo lectura)
 #   converge_extra  pasos propios del proyecto (fase 2, después de migrate)
+#   verify_extra    verificación de punta a punta (fase 2, después del reinicio).
+#                   Sólo corre si hubo cambios de código, --build o --verify, para
+#                   que una corrida sin novedades no dispare efectos externos
+#                   (p. ej. mandar un mail). Debe usar fail()/warn() si algo no anda.
 #
 set -uo pipefail
 
@@ -142,8 +146,10 @@ fi
 
 BUILD=0
 DRY_RUN=0
+FORCE_VERIFY=0
 for arg in "$@"; do
     case "$arg" in
+        --verify) FORCE_VERIFY=1 ;;
         --build)
             if [ "$SUPPORTS_BUILD" -eq 1 ]; then
                 BUILD=1
@@ -154,9 +160,9 @@ for arg in "$@"; do
         --dry-run) DRY_RUN=1 ;;
         *)
             if [ "$SUPPORTS_BUILD" -eq 1 ]; then
-                echo "uso: $0 [--build] [--dry-run]"
+                echo "uso: $0 [--build] [--dry-run] [--verify]"
             else
-                echo "uso: $0 [--dry-run]"
+                echo "uso: $0 [--dry-run] [--verify]"
             fi
             exit 2 ;;
     esac
@@ -853,6 +859,14 @@ if [ "$code_changed" -eq 1 ] || [ "$BUILD" -eq 1 ]; then
     done
 else
     ok "sin cambios de código -- no hace falta reiniciar"
+fi
+
+if declare -F verify_extra >/dev/null \
+   && { [ "$code_changed" -eq 1 ] || [ "$BUILD" -eq 1 ] || [ "$FORCE_VERIFY" -eq 1 ]; }; then
+    section "Verificación de ${PROJECT}"
+    # Se le da un momento al contenedor recién reiniciado para aceptar requests.
+    sleep 3
+    verify_extra
 fi
 
 if [ "${#SYSTEMD_UNITS[@]}" -gt 0 ]; then
