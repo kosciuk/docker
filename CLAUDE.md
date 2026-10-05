@@ -94,6 +94,7 @@ Los `logs/` de cada proyecto sí se pueden leer, pero salen crudos: usar
 | liberamerkato | `projects/liberamerkato/compose/web.yml` | `docker-liberamerkato.service` |
 | enforos | `projects/enforos/compose/web.yml` | `docker-enforos.service` |
 | consultarte | `projects/consultarte/compose/web.yml` | `docker-consultarte.service` |
+| justiciaparamargarita | `projects/justiciaparamargarita/compose/web.yml` | `docker-justiciaparamargarita.service` |
 
 ## Comandos frecuentes
 ```bash

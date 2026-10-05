@@ -25,6 +25,7 @@ services:
       - /var/www/zurdosanonimos/logs:/var/www/zurdosanonimos/logs
       - /var/www/kosciuk/logs:/var/www/kosciuk/logs
       - /var/www/linkedcode/logs:/var/www/linkedcode/logs
+      - /var/www/justiciaparamargarita/logs:/var/www/justiciaparamargarita/logs
     networks:
       - projects_public
 

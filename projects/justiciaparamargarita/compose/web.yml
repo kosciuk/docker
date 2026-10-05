@@ -1,0 +1,20 @@
+name: justiciaparamargarita
+
+services:
+  web:
+    build:
+      context: /var/www/docker
+      dockerfile: images/apache-static/Dockerfile
+    container_name: justiciaparamargarita-web
+    restart: unless-stopped
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+    volumes:
+      - /var/www/justiciaparamargarita/www:/usr/local/apache2/htdocs:ro
+    networks:
+      - projects_public
+
+networks:
+  projects_public:
+    external: true
+    name: projects_public
