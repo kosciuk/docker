@@ -10,6 +10,9 @@ Se corren en el VPS, en `/var/www/docker`.
   proyecto. Sólo existe para `linkedcode-auth` por ahora.
 - **`projects/<x>.conf`** — la config de cada proyecto (lo lee
   `<proyecto>.sh`).
+- **`granhermano-firewall.sh`** — bloquea en UFW del VPS las subnets de
+  scrapers agresivos y granjas headless (Oracle Cloud Singapur, DataForSEO, etc.).
+  Por defecto corre en simulación; `--apply` aplica con sudo.
 
 Proyectos con este esquema: consultarte, cooperativismoabierto, ember, enforos,
 granhermano, impuestounico, liberamerkato, linkedcode-auth, linkedcode-www,
